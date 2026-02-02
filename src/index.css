@@ -110,8 +110,8 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    --background: 210 25% 97.5%;
+    --foreground: 222 47% 12%;
     --gold: 38 92% 50%;
 
     --card: 0 0% 100%;
@@ -162,7 +162,12 @@
   }
 
   :root:not(.dark) body {
-    background-image: radial-gradient(circle at center top, hsl(210 20% 96%) 0%, hsl(210 20% 98%) 100%);
+    background-image:
+      radial-gradient(at 0% 0%, hsla(210, 30%, 96%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(210, 25%, 98%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(38, 50%, 94%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 100%, hsla(210, 20%, 99%, 1) 0, transparent 50%);
+    background-color: hsl(var(--background));
   }
 
   .dark body {

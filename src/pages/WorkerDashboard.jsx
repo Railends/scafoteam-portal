@@ -216,14 +216,19 @@ export default function WorkerDashboard() {
                         )}
                     </div>
                     <div>
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-3xl font-black text-scafoteam-navy tracking-tight leading-tight">{worker.name} {worker.surname}</h1>
-                            <span className="px-3 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase rounded-full shadow-lg shadow-emerald-500/20 whitespace-nowrap">{t('active')}</span>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                            <h1 className="text-2xl md:text-3xl font-black text-scafoteam-navy tracking-tight leading-tight shrink-0">{worker.name} {worker.surname}</h1>
+                            <div className="flex items-center gap-2">
+                                <span className="px-3 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase rounded-full shadow-lg shadow-emerald-500/20 whitespace-nowrap">{t('active')}</span>
+                            </div>
                         </div>
+
+
+
                         <p className="text-gray-400 font-bold text-sm mt-2 tracking-wide">{worker.adminData?.project || t('admin_no_project')}</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Button
                         variant="outline"
                         onClick={() => setIsSettingsOpen(true)}
@@ -237,6 +242,7 @@ export default function WorkerDashboard() {
                         {t('logout')}
                     </Button>
                 </div>
+
 
 
             </div>
@@ -407,10 +413,16 @@ export default function WorkerDashboard() {
                                     <p className="text-[10px] text-blue-200/50 font-bold uppercase tracking-widest mt-0.5">{t('admin_project')}</p>
                                 </div>
                             </div>
-                            <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-200/40 mb-2">{t('hourly_rate')}</p>
+                            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 relative">
+                                <div className="flex justify-between items-start mb-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-200/40">{t('hourly_rate')}</p>
+                                    {worker.adminData?.hasPerDiem && (
+                                        <span className="px-2 py-0.5 bg-scafoteam-gold text-scafoteam-navy text-[8px] font-black uppercase rounded-md shadow-lg shadow-scafoteam-gold/20 whitespace-nowrap">+ P.D</span>
+                                    )}
+                                </div>
                                 <p className="text-4xl font-black text-white">€ {worker.adminData?.hourlyRate || '0.00'}</p>
                             </div>
+
                         </CardContent>
                     </Card>
                 </div>

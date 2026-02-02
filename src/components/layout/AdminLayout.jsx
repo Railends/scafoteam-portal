@@ -160,34 +160,34 @@ export function AdminLayout({ children }) {
 
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 sm:gap-3">
                         <LanguageSwitcher />
 
                         <Link
                             to="/admin/dashboard/settings"
                             className={cn(
-                                "w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
+                                "w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
                                 location.pathname === '/admin/dashboard/settings'
                                     ? "bg-scafoteam-navy text-white border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20"
                                     : "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50 hover:border-scafoteam-navy/20 hover:shadow-md"
                             )}
                             title="Iestatījumi"
                         >
-                            <Settings className={cn("w-5 h-5 transition-transform duration-500", location.pathname === '/admin/dashboard/settings' && "rotate-90")} />
+                            <Settings className={cn("w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-500", location.pathname === '/admin/dashboard/settings' && "rotate-90")} />
                         </Link>
 
                         {isSuperAdmin && (
                             <Link
                                 to="/admin/dashboard/admins"
                                 className={cn(
-                                    "w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
+                                    "w-9 h-9 sm:w-10 sm:h-10 hidden sm:flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
                                     location.pathname === '/admin/dashboard/admins'
                                         ? "bg-scafoteam-navy text-white border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20"
                                         : "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50 hover:border-scafoteam-navy/20 hover:shadow-md"
                                 )}
                                 title={t('admin_admin_management')}
                             >
-                                <Shield className="w-5 h-5" />
+                                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
                             </Link>
                         )}
 
@@ -206,6 +206,7 @@ export function AdminLayout({ children }) {
                         </div>
                     </div>
                 </header>
+
 
                 <main className="flex-1 p-4 md:p-8 overflow-y-auto">
                     <div className="max-w-7xl mx-auto">

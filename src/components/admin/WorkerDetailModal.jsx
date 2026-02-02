@@ -352,10 +352,11 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                             </div>
 
                             {/* Statuses Footer */}
-                            <div className="flex items-center gap-8 pt-6">
+                            <div className="flex flex-wrap items-center gap-6 pt-6 border-t mt-4">
                                 <StatusBadge label={t('admin_registered')} active={true} />
                                 <StatusBadge label={t('admin_confirmed')} active={worker.status === 'active'} />
                             </div>
+
                         </div>
                     </div>
                 )}
@@ -387,6 +388,11 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                                         onChange={e => setAdminFormData(prev => ({ ...prev, hourlyRate: e.target.value }))}
                                                         placeholder="0.00"
                                                     />
+                                                    {worker.adminData?.hasPerDiem && (
+                                                        <div className="absolute -top-3 -right-2 px-2 py-0.5 bg-scafoteam-gold text-scafoteam-navy text-[8px] font-black uppercase rounded-md shadow-sm border border-scafoteam-gold/20">
+                                                            + P.D
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="pt-6">

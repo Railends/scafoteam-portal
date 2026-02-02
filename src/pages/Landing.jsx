@@ -30,7 +30,7 @@ export default function Landing() {
     return (
         <Layout className="max-w-none px-0 py-0">
             {/* Hero Section */}
-            <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden border-b border-gray-100 dark:border-white/5 bg-white dark:bg-[#0f172a]">
+            <section className="relative min-h-[95vh] flex items-center justify-center overflow-hidden border-b border-gray-100 dark:border-white/5 bg-[#faffff] dark:bg-[#0f172a]">
                 {/* Abstract Cinematic Background */}
                 <div className="absolute inset-0 z-0 overflow-hidden">
                     {/* Mesh Gradient Blobs */}
@@ -42,10 +42,11 @@ export default function Landing() {
                         }}
                         transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                         className={cn(
-                            "absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px] opacity-20",
-                            isDark ? "bg-scafoteam-gold" : "bg-scafoteam-gold/40"
+                            "absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px]",
+                            isDark ? "bg-scafoteam-gold opacity-20" : "bg-scafoteam-gold/20 opacity-40"
                         )}
                     />
+
                     <motion.div
                         animate={{
                             x: [0, -80, 0],
@@ -54,10 +55,11 @@ export default function Landing() {
                         }}
                         transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
                         className={cn(
-                            "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[100px] opacity-20",
-                            isDark ? "bg-blue-500" : "bg-blue-300"
+                            "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[100px]",
+                            isDark ? "bg-blue-500 opacity-20" : "bg-blue-200/40 opacity-50"
                         )}
                     />
+
 
                     {/* Subtle Grid Overlay */}
                     <div className={cn(
@@ -71,8 +73,9 @@ export default function Landing() {
                         "absolute inset-0 z-10 transition-colors duration-1000",
                         isDark
                             ? "bg-gradient-to-b from-[#0f172a]/60 via-[#0f172a]/90 to-[#0f172a]"
-                            : "bg-gradient-to-b from-white/40 via-white/80 to-white"
+                            : "bg-gradient-to-b from-white/10 via-white/40 to-white/90"
                     )} />
+
                 </div>
 
 
@@ -113,13 +116,14 @@ export default function Landing() {
 
                             {t('hero_subtitle')}
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center w-full max-w-sm sm:max-w-none mx-auto">
                             <Link to="/register" className="w-full sm:w-auto">
                                 <Button size="xl" className="bg-scafoteam-gold hover:bg-yellow-400 text-scafoteam-navy font-black w-full sm:w-auto px-10 rounded-2xl shadow-[0_0_30px_rgba(251,191,36,0.2)] transition-all hover:scale-105 active:scale-95">
                                     {t('register_now')} <ArrowRight className="ml-2 h-6 w-6" />
                                 </Button>
                             </Link>
                         </div>
+
                     </motion.div>
                 </div>
 
@@ -164,9 +168,10 @@ export default function Landing() {
                             <motion.div
                                 key={idx}
                                 variants={fadeInUp}
-                                className="group relative p-10 rounded-[2.5rem] bg-gray-50/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-scafoteam-gold/30 transition-all duration-500 hover:-translate-y-2"
+                                className="group relative p-10 rounded-[2.5rem] bg-white/60 dark:bg-white/5 border border-white/80 dark:border-white/10 hover:border-scafoteam-gold/30 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-scafoteam-navy/[0.02] backdrop-blur-sm"
 
                             >
+
                                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] blur-2xl -z-10`} />
                                 <div className="w-16 h-16 bg-scafoteam-navy dark:bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-gray-100 dark:border-white/10 group-hover:border-scafoteam-gold/50 transition-colors">
                                     <feature.icon className="h-8 w-8 text-scafoteam-gold transition-transform group-hover:scale-110" />

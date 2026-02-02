@@ -363,27 +363,28 @@ export default function WorkerRegistration() {
                             </AnimatePresence>
                         </CardContent>
 
-                        <CardFooter className="flex justify-between bg-gray-50/50 p-6 border-t">
+                        <CardFooter className="flex flex-col-reverse sm:flex-row justify-between gap-4 bg-gray-50/50 p-6 border-t">
                             <Button
                                 type="button"
                                 variant="ghost"
                                 onClick={prevStep}
                                 disabled={currentStep === 0}
-                                className="w-24"
+                                className="w-full sm:w-24"
                             >
                                 <ChevronLeft className="w-4 h-4 mr-2" /> {t('back')}
                             </Button>
 
                             {currentStep < STEPS.length - 1 ? (
-                                <Button type="button" onClick={nextStep} className="w-32 bg-scafoteam-navy hover:bg-scafoteam-navy/90">
+                                <Button type="button" onClick={nextStep} className="w-full sm:w-32 bg-scafoteam-navy hover:bg-scafoteam-navy/90">
                                     {t('next')} <ChevronRight className="w-4 h-4 ml-2" />
                                 </Button>
                             ) : (
-                                <Button type="submit" className="w-48 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 shadow-lg">
+                                <Button type="submit" className="w-full sm:w-48 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 shadow-lg">
                                     {t('submit')}
                                 </Button>
                             )}
                         </CardFooter>
+
                     </Card>
                 </form>
             </div>
