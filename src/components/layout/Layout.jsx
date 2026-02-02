@@ -4,7 +4,8 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { cn } from '@/lib/utils';
 import { Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import logoImage from '@/assets/logo.png';
+import { BrandLogo } from '../common/BrandLogo';
+
 
 export function Layout({ children, className }) {
     const { t } = useTranslation();
@@ -19,10 +20,12 @@ export function Layout({ children, className }) {
                         </Link>
                     </div>
 
-                    <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 group">
-                        <img src={logoImage} alt="Scafoteam Logo" className="h-10 w-auto transition-transform group-hover:scale-105" />
-                        <span className="font-bold text-lg hidden lg:inline-block text-scafoteam-navy tracking-tight group-hover:opacity-80 transition-opacity">Scafoteam Finland</span>
+                    <Link to="/" className="absolute left-1/2 -translate-x-1/2 group h-12">
+                        <BrandLogo className="h-full" />
                     </Link>
+
+
+
 
                     <div className="flex items-center gap-3">
                         <nav className="hidden md:flex items-center gap-1">

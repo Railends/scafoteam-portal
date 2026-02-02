@@ -3,7 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BrandLogo } from '../common/BrandLogo';
+
+
+
+import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings } from 'lucide-react';
 
 export function AdminLayout({ children }) {
     const { t } = useTranslation();
@@ -27,7 +32,6 @@ export function AdminLayout({ children }) {
         { label: t('admin_catalogs'), path: '/admin/dashboard/catalogs', icon: Package },
         { label: t('admin_training'), path: '/admin/dashboard/training', icon: GraduationCap },
         { label: t('admin_document_templates'), path: '/admin/dashboard/templates', icon: FileText },
-        ...(isSuperAdmin ? [{ label: t('admin_admin_management'), path: '/admin/dashboard/admins', icon: Shield }] : []),
     ];
 
     const NavLinks = ({ onClick }) => (
@@ -58,76 +62,143 @@ export function AdminLayout({ children }) {
     return (
         <div className="min-h-screen flex bg-gray-100 font-sans">
             {/* Desktop Sidebar */}
-            <aside className="w-64 bg-scafoteam-navy text-white flex-shrink-0 hidden md:flex flex-col">
+            <aside className="w-64 bg-scafoteam-navy text-white flex-shrink-0 hidden md:flex flex-col border-r border-white/5 shadow-2xl">
                 <div className="p-6 border-b border-white/10">
-                    <h1 className="text-xl font-bold tracking-tight">Scafoteam Admin</h1>
+                    <div className="flex items-center justify-center h-12 overflow-hidden px-4">
+                        <BrandLogo variant="white" className="h-full" />
+                    </div>
+
+
                 </div>
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+                    <div className="px-3 mb-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Izvēlne</p>
+                    </div>
                     <NavLinks />
                 </nav>
-                <div className="p-4 border-t border-white/10 space-y-4">
-                    <LanguageSwitcher className="px-2" showRU={false} />
+                <div className="p-4 border-t border-white/10">
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-lg text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors text-sm font-medium"
+                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-lg text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-all text-sm font-bold group"
                     >
-                        <LogOut className="w-5 h-5" />
+                        <div className="p-1.5 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors">
+                            <LogOut className="w-4 h-4" />
+                        </div>
                         {t('admin_logout')}
                     </button>
                 </div>
             </aside>
 
             {/* Mobile Menu Overlay */}
-            {mobileMenuOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
-                    onClick={() => setMobileMenuOpen(false)}
-                />
-            )}
+            <AnimatePresence>
+                {mobileMenuOpen && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-scafoteam-navy/60 backdrop-blur-sm z-40 md:hidden"
+                            onClick={() => setMobileMenuOpen(false)}
+                        />
+                        <motion.aside
+                            initial={{ x: '-100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '-100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="fixed top-0 left-0 h-full w-72 bg-scafoteam-navy text-white z-50 flex flex-col shadow-2xl"
+                        >
+                            <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                                <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-scafoteam-gold rounded-lg flex items-center justify-center">
+                                        <Shield className="w-5 h-5 text-scafoteam-navy" />
+                                    </div>
+                                    <span>SCAFOTEAM</span>
+                                </h1>
+                                <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+                                <NavLinks onClick={() => setMobileMenuOpen(false)} />
+                            </nav>
+                            <div className="p-4 border-t border-white/10">
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-3 px-4 py-4 w-full text-left rounded-xl text-red-300 bg-red-500/5 hover:bg-red-500/10 hover:text-red-200 transition-all text-sm font-bold"
+                                >
+                                    <LogOut className="w-5 h-5" />
+                                    {t('admin_logout')}
+                                </button>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
 
-            {/* Mobile Sidebar */}
-            <aside className={cn(
-                "fixed top-0 left-0 h-full w-64 bg-scafoteam-navy text-white z-50 transform transition-transform duration-300 md:hidden flex flex-col",
-                mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-            )}>
-                <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                    <h1 className="text-xl font-bold tracking-tight">Scafoteam Admin</h1>
-                    <button onClick={() => setMobileMenuOpen(false)} className="text-white">
-                        <X className="w-6 h-6" />
-                    </button>
-                </div>
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    <NavLinks onClick={() => setMobileMenuOpen(false)} />
-                </nav>
-                <div className="p-4 border-t border-white/10 space-y-4">
-                    <LanguageSwitcher className="px-2" />
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-lg text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors text-sm font-medium"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        {t('admin_logout')}
-                    </button>
-                </div>
-            </aside>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Modern Header */}
+                <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setMobileMenuOpen(true)}
+                            className="p-2.5 md:hidden hover:bg-gray-50 rounded-xl transition-all active:scale-95"
+                        >
+                            <Menu className="w-6 h-6 text-scafoteam-navy" />
+                        </button>
 
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                {/* Mobile Header */}
-                <header className="h-16 bg-white border-b flex items-center justify-between px-4 md:hidden sticky top-0 z-30">
-                    <button
-                        onClick={() => setMobileMenuOpen(true)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                        <Menu className="w-6 h-6 text-scafoteam-navy" />
-                    </button>
-                    <span className="font-bold text-scafoteam-navy">Scafoteam Admin</span>
-                    <div className="w-10" /> {/* Spacer for centering */}
+                        <div className="hidden md:flex items-center gap-3">
+                            <div className="w-1.5 h-6 bg-scafoteam-gold rounded-full" />
+                            <h2 className="text-sm font-black text-scafoteam-navy uppercase tracking-widest">
+                                {navItems.find(item => item.path === location.pathname)?.label || t('admin_panel')}
+                            </h2>
+                        </div>
+
+                        {/* Mobile Brand */}
+                        <BrandLogo className="h-10 md:hidden" />
+
+
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <LanguageSwitcher />
+
+                        {isSuperAdmin && (
+                            <Link
+                                to="/admin/dashboard/admins"
+                                className={cn(
+                                    "w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
+                                    location.pathname === '/admin/dashboard/admins'
+                                        ? "bg-scafoteam-navy text-white border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20"
+                                        : "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50 hover:border-scafoteam-navy/20 hover:shadow-md"
+                                )}
+                                title={t('admin_admin_management')}
+                            >
+                                <Settings className={cn("w-5 h-5 transition-transform duration-500", location.pathname === '/admin/dashboard/admins' && "rotate-90")} />
+                            </Link>
+                        )}
+
+                        <div className="h-6 w-px bg-gray-100 mx-1 hidden md:block" />
+
+                        <div className="hidden md:flex items-center gap-3 pl-2">
+                            <div className="flex flex-col items-end">
+                                <p className="text-[10px] font-black text-scafoteam-navy leading-none uppercase tracking-tighter">{adminUser.full_name || adminUser.username || 'Admin'}</p>
+                                <p className="text-[8px] font-bold text-gray-400 leading-none mt-1 uppercase tracking-widest">{adminUser.role || 'User'}</p>
+                            </div>
+
+                            <div className="w-9 h-9 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-scafoteam-navy shadow-inner">
+                                <Shield className="w-4 h-4" />
+                            </div>
+                        </div>
+                    </div>
                 </header>
-                <div className="p-4 md:p-8">
-                    {children}
-                </div>
-            </main>
+
+                <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+                    <div className="max-w-7xl mx-auto">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 }

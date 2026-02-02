@@ -367,8 +367,61 @@ export const adminStore = {
                     actualPassword = admin.password;
                 }
             }
-            if (actualPassword === password) return admin;
+            if (actualPassword === password) return {
+                id: admin.id,
+                username: admin.username,
+                role: admin.role,
+                full_name: admin.full_name
+            };
+
         }
         return null;
+    },
+
+    getAll: async () => {
+        const { data, error } = await supabase.from('admins').select('*').order('username');
+        handleSupabaseError(error, 'getAllAdmins');
+        return data || [];
+    },
+
+
+
+    add: async (adminData) => {
+        const payload = { ...adminData };
+        if (payload.password) {
+            payload.password = 'obf:' + btoa(payload.password);
+        }
+
+        console.log('Adding admin with payload:', payload);
+        const { data, error } = await supabase.from('admins').insert([payload]).select().single();
+        if (error) {
+            console.error('Error adding admin:', error);
+            alert('Kļūda saglabājot adminu (pārliecinies, ka esi pievienojis full_name kolonnu datubāzē): ' + error.message);
+            throw error;
+        }
+        return data;
+    },
+
+    update: async (id, updates) => {
+        const payload = { ...updates };
+        if (payload.password) {
+            payload.password = 'obf:' + btoa(payload.password);
+        }
+
+        console.log('Updating admin with payload:', payload);
+        const { data, error } = await supabase.from('admins').update(payload).eq('id', id).select().single();
+        if (error) {
+            console.error('Error updating admin:', error);
+            alert('Kļūda atjaunojot adminu (pārliecinies, ka esi pievienojis full_name kolonnu datubāzē): ' + error.message);
+            throw error;
+        }
+        return data;
+    },
+
+
+
+    delete: async (id) => {
+        const { error } = await supabase.from('admins').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteAdmin');
     }
 };

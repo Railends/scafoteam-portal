@@ -1,47 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { adminStore } from '@/lib/store';
-import { Plus, Edit2, Trash2, Shield, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Shield, X, Check, Loader2 } from 'lucide-react';
 
 export default function AdminManagement() {
     const { t } = useTranslation();
-    const [admins, setAdmins] = useState(adminStore.getAll());
+    const [admins, setAdmins] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAdmin, setEditingAdmin] = useState(null);
-    const [formData, setFormData] = useState({ username: '', password: '', role: 'admin' });
+    const [formData, setFormData] = useState({ username: '', password: '', role: 'admin', full_name: '' });
+
+
+    useEffect(() => {
+        loadAdmins();
+    }, []);
+
+    const loadAdmins = async () => {
+        setIsLoading(true);
+        try {
+            const data = await adminStore.getAll();
+            setAdmins(data);
+        } catch (error) {
+            console.error('Failed to load admins:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleOpenModal = (admin = null) => {
         if (admin) {
             setEditingAdmin(admin);
-            setFormData({ username: admin.username, password: '', role: admin.role });
+            setFormData({ username: admin.username, password: '', role: admin.role, full_name: admin.full_name || '' });
         } else {
             setEditingAdmin(null);
-            setFormData({ username: '', password: '', role: 'admin' });
+            setFormData({ username: '', password: '', role: 'admin', full_name: '' });
         }
+
         setIsModalOpen(true);
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-        if (editingAdmin) {
-            const updates = { ...formData };
-            if (!updates.password) delete updates.password;
-            adminStore.update(editingAdmin.id, updates);
-        } else {
-            adminStore.add(formData);
+        try {
+            if (editingAdmin) {
+                const updates = { ...formData };
+                if (!updates.password) delete updates.password;
+                const updated = await adminStore.update(editingAdmin.id, updates);
+
+                // If we updated our own profile, sync with localStorage
+                const currentUser = JSON.parse(localStorage.getItem('scafoteam_admin_user') || '{}');
+                if (currentUser.id === editingAdmin.id && updated) {
+                    localStorage.setItem('scafoteam_admin_user', JSON.stringify({
+                        ...currentUser,
+                        username: updated.username,
+                        full_name: updated.full_name,
+                        role: updated.role
+                    }));
+                    // Trigger a reload to refresh the entire layout and header
+                    window.location.reload();
+                }
+            } else {
+                await adminStore.add(formData);
+            }
+
+            await loadAdmins();
+            setIsModalOpen(false);
+        } catch (error) {
+            console.error('Failed to save admin:', error);
         }
-        setAdmins(adminStore.getAll());
-        setIsModalOpen(false);
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm(t('admin_confirm_delete'))) {
-            adminStore.delete(id);
-            setAdmins(adminStore.getAll());
+            try {
+                await adminStore.delete(id);
+                await loadAdmins();
+            } catch (error) {
+                console.error('Failed to delete admin:', error);
+            }
         }
     };
 
@@ -64,7 +105,7 @@ export default function AdminManagement() {
                             <CardHeader>
                                 <div className="flex justify-between items-start">
                                     <div className="w-12 h-12 bg-scafoteam-navy/10 rounded-xl flex items-center justify-center">
-                                        <Plus className="w-6 h-6 text-scafoteam-navy" />
+                                        <Shield className="w-6 h-6 text-scafoteam-navy" />
                                     </div>
                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => handleOpenModal(admin)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
@@ -75,8 +116,13 @@ export default function AdminManagement() {
                                         </button>
                                     </div>
                                 </div>
-                                <CardTitle className="mt-4">{admin.username}</CardTitle>
-                                <CardDescription className="capitalize">
+                                <CardTitle className="mt-4">{admin.full_name || admin.username}</CardTitle>
+                                {admin.full_name && (
+                                    <CardDescription className="text-xs font-medium text-gray-400 -mt-1">
+                                        {admin.username}
+                                    </CardDescription>
+                                )}
+                                <CardDescription className="capitalize mt-2">
                                     {admin.role === 'superadmin' ? t('admin_role_superadmin') : t('admin_role_admin')}
                                 </CardDescription>
                             </CardHeader>
@@ -84,6 +130,7 @@ export default function AdminManagement() {
                     ))}
                 </div>
             </div>
+
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -97,7 +144,16 @@ export default function AdminManagement() {
                         <form onSubmit={handleSave}>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('admin_full_name') || 'Vārds Uzvārds'}</label>
+                                    <Input
+                                        value={formData.full_name}
+                                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                        placeholder="Jānis Bērziņš"
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <label className="text-sm font-medium">{t('admin_username')}</label>
+
                                     <Input
                                         required
                                         value={formData.username}
@@ -139,6 +195,6 @@ export default function AdminManagement() {
                     </Card>
                 </div>
             )}
-        </AdminLayout>
+        </AdminLayout >
     );
 }

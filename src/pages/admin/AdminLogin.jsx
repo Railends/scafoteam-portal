@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Lock } from 'lucide-react';
 import { adminStore } from '@/lib/store';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function AdminLogin() {
     const { t } = useTranslation();
@@ -24,8 +25,10 @@ export default function AdminLogin() {
             localStorage.setItem('scafoteam_admin_user', JSON.stringify({
                 id: admin.id,
                 username: admin.username,
-                role: admin.role
+                role: admin.role,
+                full_name: admin.full_name
             }));
+
             navigate('/admin/dashboard');
         } else {
             setError(t('admin_invalid_credentials'));
@@ -40,9 +43,13 @@ export default function AdminLogin() {
                 </div>
                 <Card className="w-full max-w-md shadow-2xl">
                     <CardHeader className="text-center space-y-4">
-                        <div className="w-16 h-16 bg-scafoteam-navy rounded-2xl mx-auto flex items-center justify-center">
-                            <Lock className="w-8 h-8 text-white" />
+                        <div className="flex items-center justify-center mb-8 h-20">
+                            <BrandLogo className="h-full" />
                         </div>
+
+
+
+
                         <CardTitle className="text-2xl">{t('admin_portal')}</CardTitle>
                         <CardDescription>{t('admin_login_desc')}</CardDescription>
                     </CardHeader>
