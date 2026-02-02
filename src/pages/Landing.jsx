@@ -100,11 +100,13 @@ export default function Landing() {
 
                             {t('hero_title')} <br />
                             <span className={cn(
-                                "text-transparent bg-clip-text bg-gradient-to-r from-scafoteam-gold to-scafoteam-gold",
-                                isDark ? "via-yellow-200" : "via-yellow-500"
+                                "text-white select-none transition-all duration-700",
+                                "[-webkit-text-stroke:1px_#f59e0b] [text-stroke:1px_#f59e0b]",
+                                "drop-shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:drop-shadow-[0_0_30px_rgba(245,158,11,0.6)]"
                             )}>
                                 SCAFOTEAM
                             </span>
+
 
                         </h1>
                         <p className={cn(

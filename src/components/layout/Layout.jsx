@@ -29,8 +29,8 @@ export function Layout({ children, className }) {
                     ? "bg-[#0f172a]/80 border-white/5 supports-[backdrop-filter]:bg-[#0f172a]/60"
                     : "bg-white/80 border-gray-100 supports-[backdrop-filter]:bg-white/60"
             )}>
-                <div className="container flex h-20 items-center justify-between px-4 md:px-8 max-w-7xl mx-auto">
-                    <div className="flex items-center gap-2 md:gap-4">
+                <div className="container flex h-16 sm:h-20 items-center justify-between px-2 sm:px-4 md:px-8 max-w-7xl mx-auto relative">
+                    <div className="flex items-center gap-1.5 sm:gap-4">
                         <LanguageSwitcher />
 
                         <button
@@ -41,28 +41,29 @@ export function Layout({ children, className }) {
                             )}
                             title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
-                            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                            {isDark ? <Sun className="w-3.5 h-3.5 sm:w-4 h-4" /> : <Moon className="w-3.5 h-3.5 sm:w-4 h-4" />}
                         </button>
 
                         <Link to="/worker/login" className={cn(
-                            "hidden lg:flex items-center gap-2 px-6 py-2.5 text-xs font-black rounded-full transition-all shadow-lg hover:scale-105 active:scale-95",
+                            "hidden sm:flex items-center gap-2 px-3 sm:px-6 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black rounded-full transition-all shadow-lg hover:scale-105 active:scale-95",
                             isDark
                                 ? "bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:border-white/40"
                                 : "bg-white border border-gray-200 text-scafoteam-navy hover:bg-gray-50 shadow-sm"
                         )}>
-                            {t('worker_portal')}
+                            <span className="hidden md:inline">{t('worker_portal')}</span>
+                            <span className="md:hidden">PORTAL</span>
                         </Link>
 
                     </div>
 
-                    <Link to="/" className="absolute left-1/2 -translate-x-1/2 group h-12">
+                    <Link to="/" className="absolute left-1/2 -translate-x-1/2 group h-8 sm:h-12 flex items-center">
                         <BrandLogo className="h-full" variant={isDark ? 'white' : 'default'} />
                     </Link>
 
-                    <div className="flex items-center gap-3">
-                        <nav className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <nav className="flex items-center gap-2 sm:gap-3 text-right">
                             <Link to="/register" className={cn(
-                                "px-8 py-2.5 text-xs font-black rounded-full transition-all shadow-xl hover:scale-105 active:scale-95",
+                                "px-4 sm:px-8 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black rounded-full transition-all shadow-xl hover:scale-105 active:scale-95",
                                 isDark
                                     ? "bg-white text-scafoteam-navy hover:bg-gray-100 shadow-white/5"
                                     : "bg-scafoteam-navy text-white hover:bg-scafoteam-navy/90 shadow-scafoteam-navy/20"
@@ -74,6 +75,7 @@ export function Layout({ children, className }) {
                     </div>
                 </div>
             </header>
+
             <main className={cn("flex-1 container max-w-5xl mx-auto py-8 px-4 md:px-8", className)}>
                 {children}
             </main>

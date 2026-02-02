@@ -138,13 +138,13 @@ export function AdminLayout({ children }) {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Modern Header */}
-                <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 shadow-sm">
-                    <div className="flex items-center gap-4">
+                <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-2 sm:px-4 md:px-8 sticky top-0 z-30 shadow-sm relative">
+                    <div className="flex items-center gap-1.5 sm:gap-4">
                         <button
                             onClick={() => setMobileMenuOpen(true)}
-                            className="p-2.5 md:hidden hover:bg-gray-50 rounded-xl transition-all active:scale-95"
+                            className="p-2 sm:p-2.5 md:hidden hover:bg-gray-50 rounded-xl transition-all active:scale-95"
                         >
-                            <Menu className="w-6 h-6 text-scafoteam-navy" />
+                            <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-scafoteam-navy" />
                         </button>
 
                         <div className="hidden md:flex items-center gap-3">
@@ -155,10 +155,13 @@ export function AdminLayout({ children }) {
                         </div>
 
                         {/* Mobile Brand */}
-                        <BrandLogo className="h-10 md:hidden" />
+                        <div className="md:hidden flex items-center absolute left-1/2 -translate-x-1/2 h-7 sm:h-10">
+                            <BrandLogo className="h-full" />
+                        </div>
 
 
                     </div>
+
 
                     <div className="flex items-center gap-1 sm:gap-3">
                         <LanguageSwitcher />
