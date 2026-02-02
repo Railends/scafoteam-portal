@@ -163,6 +163,19 @@ export function AdminLayout({ children }) {
                     <div className="flex items-center gap-3">
                         <LanguageSwitcher />
 
+                        <Link
+                            to="/admin/dashboard/settings"
+                            className={cn(
+                                "w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95",
+                                location.pathname === '/admin/dashboard/settings'
+                                    ? "bg-scafoteam-navy text-white border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20"
+                                    : "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50 hover:border-scafoteam-navy/20 hover:shadow-md"
+                            )}
+                            title="Iestatījumi"
+                        >
+                            <Settings className={cn("w-5 h-5 transition-transform duration-500", location.pathname === '/admin/dashboard/settings' && "rotate-90")} />
+                        </Link>
+
                         {isSuperAdmin && (
                             <Link
                                 to="/admin/dashboard/admins"
@@ -174,9 +187,10 @@ export function AdminLayout({ children }) {
                                 )}
                                 title={t('admin_admin_management')}
                             >
-                                <Settings className={cn("w-5 h-5 transition-transform duration-500", location.pathname === '/admin/dashboard/admins' && "rotate-90")} />
+                                <Shield className="w-5 h-5" />
                             </Link>
                         )}
+
 
                         <div className="h-6 w-px bg-gray-100 mx-1 hidden md:block" />
 

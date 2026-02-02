@@ -7,8 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { CheckCircle, XCircle, Search, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { WorkerDetailModal } from '@/components/admin/WorkerDetailModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { emailService } from '@/lib/emailService';
 
 export default function PendingWorkers() {
+
+
     const { t } = useTranslation();
     const [workers, setWorkers] = useState([]);
     const [search, setSearch] = useState('');
@@ -22,30 +26,32 @@ export default function PendingWorkers() {
         loadWorkers();
     }, []);
 
-    const handleApprove = async (id) => {
-        if (window.confirm(t('admin_approve_confirm'))) {
-            const password = workerStore.generatePassword();
-            const worker = workers.find(w => w.id === id);
+    const [confirmData, setConfirmData] = useState({ isOpen: false, id: null });
 
-            // Update worker status and password
-            await workerStore.update(id, {
-                status: 'active',
-                adminData: { password }
-            });
+    const handleApproveClick = async (id) => {
+        const password = workerStore.generatePassword();
+        const worker = workers.find(w => w.id === id);
 
-            // "Send" email
-            try {
-                await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, password);
-                alert(t('admin_password_sent', { email: worker.email }));
-            } catch (error) {
-                console.error('Failed to send email:', error);
-                alert('Kļūda nosūtot e-pastu. Parole tomēr ir saglabāta.');
-            }
+        // Update worker status and password
+        await workerStore.update(id, {
+            status: 'active',
+            adminData: { password }
+        });
 
-            setWorkers(prev => prev.filter(w => w.id !== id));
-            if (selectedWorker?.id === id) setSelectedWorker(null);
+        // "Send" email
+        try {
+            await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, password);
+            alert(t('admin_password_sent', { email: worker.email }));
+        } catch (error) {
+            console.error('Failed to send email:', error);
+            alert('Kļūda nosūtot e-pastu. Parole tomēr ir saglabāta.');
         }
+
+        setWorkers(prev => prev.filter(w => w.id !== id));
+        if (selectedWorker?.id === id) setSelectedWorker(null);
     };
+
+
 
     const filtered = workers.filter(w =>
         (w.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -98,7 +104,7 @@ export default function PendingWorkers() {
                                             {t('admin_view')}
                                         </Button>
                                         <Button
-                                            onClick={() => handleApprove(worker.id)}
+                                            onClick={() => handleApproveClick(worker.id)}
                                             className="bg-emerald-600 hover:bg-emerald-700"
                                         >
                                             <CheckCircle className="w-4 h-4 mr-2" />
@@ -120,7 +126,10 @@ export default function PendingWorkers() {
                         if (selectedWorker && selectedWorker.id === updated.id) setSelectedWorker(updated);
                     }}
                 />
+
+
             </div>
+
         </AdminLayout>
     );
 }

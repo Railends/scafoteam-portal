@@ -60,15 +60,17 @@ export default function WorkerRegistration() {
 
     const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 0));
 
-    const onSubmit = (data) => {
+    const onSubmit = async (data) => {
         try {
-            workerStore.add(data);
+            await workerStore.add(data);
             setSubmitted(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (e) {
-            alert("Error saving data");
+            console.error('Registration failed:', e);
+            alert("Kļūda saglabājot datus: " + (e.message || e));
         }
     };
+
 
     if (submitted) {
         return (
@@ -141,7 +143,23 @@ export default function WorkerRegistration() {
                                                             { value: 'Poland', label: t('countries.poland') },
                                                             { value: 'Ukraine', label: t('countries.ukraine') },
                                                             { value: 'Finland', label: t('countries.finland') },
+                                                            { value: 'Germany', label: t('countries.germany') },
+                                                            { value: 'Sweden', label: t('countries.sweden') },
+                                                            { value: 'Norway', label: t('countries.norway') },
+                                                            { value: 'Denmark', label: t('countries.denmark') },
+                                                            { value: 'Romania', label: t('countries.romania') },
+                                                            { value: 'Bulgaria', label: t('countries.bulgaria') },
+                                                            { value: 'Hungary', label: t('countries.hungary') },
+                                                            { value: 'Czech', label: t('countries.czech') },
+                                                            { value: 'Slovakia', label: t('countries.slovakia') },
+                                                            { value: 'France', label: t('countries.france') },
+                                                            { value: 'Spain', label: t('countries.spain') },
+                                                            { value: 'Italy', label: t('countries.italy') },
+                                                            { value: 'Uzbekistan', label: t('countries.uzbekistan') },
+                                                            { value: 'Tajikistan', label: t('countries.tajikistan') },
+                                                            { value: 'Kazakhstan', label: t('countries.kazakhstan') },
                                                             { value: 'Other', label: t('countries.other') },
+
                                                         ]}
                                                     />
                                                 )}
@@ -172,7 +190,30 @@ export default function WorkerRegistration() {
                                         <div className="space-y-4">
                                             <Input type="email" {...register('email', { required: true })} placeholder={t('email')} error={errors.email && t('required')} />
                                             <div className="flex gap-2">
-                                                <Select className="w-28" options={[{ value: '+371', label: '🇱🇻 +371' }, { value: '+358', label: '🇫🇮 +358' }, { value: '+372', label: '🇪🇪 +372' }]} {...register('phonePrefix')} />
+                                                <Select className="w-28" options={[
+                                                    { value: '+371', label: '🇱🇻 +371' },
+                                                    { value: '+358', label: '🇫🇮 +358' },
+                                                    { value: '+372', label: '🇪🇪 +372' },
+                                                    { value: '+370', label: '🇱🇹 +370' },
+                                                    { value: '+48', label: '🇵🇱 +48' },
+                                                    { value: '+380', label: '🇺🇦 +380' },
+                                                    { value: '+49', label: '🇩🇪 +49' },
+                                                    { value: '+46', label: '🇸🇪 +46' },
+                                                    { value: '+47', label: '🇳🇴 +47' },
+                                                    { value: '+45', label: '🇩🇰 +45' },
+                                                    { value: '+40', label: '🇷🇴 +40' },
+                                                    { value: '+359', label: '🇧🇬 +359' },
+                                                    { value: '+36', label: '🇭🇺 +36' },
+                                                    { value: '+420', label: '🇨🇿 +420' },
+                                                    { value: '+421', label: '🇸🇰 +421' },
+                                                    { value: '+33', label: '🇫🇷 +33' },
+                                                    { value: '+34', label: '🇪🇸 +34' },
+                                                    { value: '+39', label: '🇮🇹 +39' },
+                                                    { value: '+998', label: '🇺🇿 +998' },
+                                                    { value: '+992', label: '🇹🇯 +992' },
+                                                    { value: '+7', label: '🇰🇿 +7' },
+                                                ]} {...register('phonePrefix')} />
+
                                                 <Input type="tel" className="flex-1" {...register('phone', { required: true })} placeholder={t('phone')} error={errors.phone && t('required')} />
                                             </div>
                                             <Input {...register('address', { required: true, pattern: /^[A-Za-z\s\-\.\,\d\u00C0-\u00FF\u0100-\u017F]+$/ })} placeholder={t('address')} error={errors.address && (errors.address.type === 'pattern' ? t('latin_only') : t('required'))} />
@@ -245,8 +286,9 @@ export default function WorkerRegistration() {
                                             <div className="space-y-4">
                                                 <h3 className="font-bold text-lg text-scafoteam-navy border-b pb-2">{t('bank_details')}</h3>
                                                 <div className="grid md:grid-cols-2 gap-4">
-                                                    <Input {...register('bankAccount', { required: true, pattern: /^[A-Z0-9]+$/ })} placeholder="IBAN" label="IBAN" error={errors.bankAccount && (errors.bankAccount.type === 'pattern' ? t('latin_only') : t('required'))} />
-                                                    <Input {...register('bicCode', { required: true, pattern: /^[A-Z0-9]+$/ })} placeholder="BIC" label="BIC CODE" error={errors.bicCode && (errors.bicCode.type === 'pattern' ? t('latin_only') : t('required'))} />
+                                                    <Input {...register('bankAccount', { required: true, pattern: /^[A-Za-z0-9]+$/ })} placeholder="IBAN" label="IBAN" error={errors.bankAccount && (errors.bankAccount.type === 'pattern' ? t('latin_only') : t('required'))} />
+                                                    <Input {...register('bicCode', { required: true, pattern: /^[A-Za-z0-9]+$/ })} placeholder="BIC" label="BIC CODE" error={errors.bicCode && (errors.bicCode.type === 'pattern' ? t('latin_only') : t('required'))} />
+
                                                 </div>
                                             </div>
 

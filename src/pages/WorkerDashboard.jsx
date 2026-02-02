@@ -4,11 +4,16 @@ import { useTranslation } from 'react-i18next';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { User, FileText, Download, LogOut, ShieldCheck, Mail, Phone, MapPin, Building2, Calendar, Briefcase, CheckSquare, Square, PenTool, Check, Loader2 } from 'lucide-react';
+import { User, FileText, Download, LogOut, ShieldCheck, Mail, Phone, MapPin, Building2, Calendar, Briefcase, CheckSquare, Square, PenTool, Check, Loader2, Upload } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { workerStore, templateStore } from '@/lib/store';
 import { docGenerator } from '@/lib/docGenerator';
 import { SignatureModal } from '@/components/ui/SignatureModal';
+import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import { Settings } from 'lucide-react';
+
 
 export default function WorkerDashboard() {
     const { t } = useTranslation();
@@ -17,7 +22,13 @@ export default function WorkerDashboard() {
     const [selectedContracts, setSelectedContracts] = useState([]);
     const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+    const [isUploading, setIsUploading] = useState(false);
     const [showToast, setShowToast] = useState(false);
+
+
 
     useEffect(() => {
         const stored = sessionStorage.getItem('workerData');
@@ -48,7 +59,43 @@ export default function WorkerDashboard() {
         navigate('/worker/login');
     };
 
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        if (passwords.new !== passwords.confirm) {
+            alert('Paroles nesakrīt!');
+            return;
+        }
+
+        setIsSavingSettings(true);
+        try {
+            await workerStore.update(worker.id, {
+                adminData: { password: passwords.new }
+            });
+
+            // Update local state and sessionStorage
+            const updatedWorker = {
+                ...worker,
+                adminData: { ...worker.adminData, password: 'obf:' + btoa(passwords.new) }
+            };
+            setWorker(updatedWorker);
+            sessionStorage.setItem('workerData', JSON.stringify(updatedWorker));
+
+            setPasswords({ new: '', confirm: '' });
+            setIsSettingsOpen(false);
+
+            // Show success toast
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } catch (error) {
+            console.error('Failed to change password:', error);
+            alert('Kļūda mainot paroli');
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
     const toggleContractSelection = (id) => {
+
         setSelectedContracts(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
@@ -113,6 +160,38 @@ export default function WorkerDashboard() {
         document.body.removeChild(link);
     };
 
+    const handleAddDocument = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            try {
+                const updatedWorker = await workerStore.addDocument(worker.id, {
+                    name: file.name,
+                    content: reader.result,
+                    folderId: null
+                });
+
+                if (updatedWorker) {
+                    setWorker(updatedWorker);
+                    sessionStorage.setItem('workerData', JSON.stringify(updatedWorker));
+                }
+
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } catch (error) {
+                console.error('Upload failed:', error);
+                alert('Augšupielāde neizdevās');
+            } finally {
+                setIsUploading(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+
     const InfoRow = ({ icon: Icon, label, value }) => (
         <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/50 border border-transparent hover:border-gray-100 hover:bg-white transition-all duration-300 group">
             <div className="p-2.5 bg-scafoteam-navy/5 rounded-xl text-scafoteam-navy group-hover:scale-110 transition-transform">
@@ -144,10 +223,22 @@ export default function WorkerDashboard() {
                         <p className="text-gray-400 font-bold text-sm mt-2 tracking-wide">{worker.adminData?.project || t('admin_no_project')}</p>
                     </div>
                 </div>
-                <Button variant="outline" onClick={handleLogout} className="border-gray-200 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl px-6 font-bold h-12 transition-all">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    {t('logout')}
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="bg-white border-gray-200 text-scafoteam-navy hover:bg-scafoteam-navy/5 rounded-xl px-4 font-bold h-12 transition-all shadow-sm"
+                        title={t('change_password')}
+                    >
+                        <Settings className="w-5 h-5" />
+                    </Button>
+                    <Button variant="outline" onClick={handleLogout} className="border-gray-200 text-gray-500 hover:text-red-500 hover:bg-red-50 bg-white rounded-xl px-6 font-bold h-12 transition-all shadow-sm">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        {t('logout')}
+                    </Button>
+                </div>
+
+
             </div>
 
             <div className="grid lg:grid-cols-3 gap-8">
@@ -244,10 +335,30 @@ export default function WorkerDashboard() {
                     </div>
 
                     <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-xl shadow-scafoteam-navy/5">
-                        <h3 className="text-xs font-black text-scafoteam-navy uppercase tracking-widest border-b border-gray-100 pb-4 mb-6 flex items-center gap-3">
-                            <FileText className="w-4 h-4" />
-                            {t('admin_personal_documents')}
-                        </h3>
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+                            <h3 className="text-xs font-black text-scafoteam-navy uppercase tracking-widest flex items-center gap-3">
+                                <FileText className="w-4 h-4" />
+                                {t('admin_personal_documents')}
+                            </h3>
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    id="worker-doc-upload"
+                                    className="hidden"
+                                    onChange={handleAddDocument}
+                                />
+                                <Button
+                                    size="sm"
+                                    onClick={() => document.getElementById('worker-doc-upload').click()}
+                                    className="bg-scafoteam-gold hover:bg-scafoteam-gold/90 text-scafoteam-navy font-black h-8 px-4 text-[10px] rounded-lg shadow-lg shadow-scafoteam-gold/20"
+                                    disabled={isUploading}
+                                >
+                                    {isUploading ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : <Upload className="w-3 h-3 mr-2" />}
+                                    {t('admin_upload_doc') || 'UPL.'}
+                                </Button>
+                            </div>
+                        </div>
+
                         {(!worker.documents || worker.documents.length === 0) ? (
                             <div className="text-center py-10 text-gray-400 text-sm font-bold uppercase tracking-widest">
                                 {t('admin_no_documents')}
@@ -325,6 +436,50 @@ export default function WorkerDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Settings / Password Modal */}
+            <Modal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                title={t('change_password')}
+                className="max-w-md"
+            >
+                <form onSubmit={handlePasswordChange} className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('new_password')}</label>
+                            <Input
+                                type="password"
+                                required
+                                value={passwords.new}
+                                onChange={e => setPasswords({ ...passwords, new: e.target.value })}
+                                className="h-12 bg-gray-50/20"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('confirm_password')}</label>
+                            <Input
+                                type="password"
+                                required
+                                value={passwords.confirm}
+                                onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
+                                className="h-12 bg-gray-50/20"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                        <Button type="button" variant="ghost" onClick={() => setIsSettingsOpen(false)} className="flex-1">
+                            {t('cancel')}
+                        </Button>
+                        <Button type="submit" disabled={isSavingSettings} className="flex-1 bg-scafoteam-navy hover:bg-scafoteam-navy/90">
+                            {isSavingSettings ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+                            {t('save')}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
         </Layout>
     );
 }

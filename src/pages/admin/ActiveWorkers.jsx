@@ -99,12 +99,19 @@ export default function ActiveWorkers() {
         setWorkers(prev => prev.map(w => w.id === id ? updatedWorker : w));
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm(t('admin_confirm_delete') || 'Are you sure you want to delete this worker?')) {
-            await workerStore.delete(id);
-            loadData();
-        }
+    const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+
+    const handleDeleteClick = (id) => {
+        setConfirmDelete({ isOpen: true, id });
     };
+
+    const handleDeleteConfirm = async () => {
+        const id = confirmDelete.id;
+        if (!id) return;
+        await workerStore.delete(id);
+        loadData();
+    };
+
 
     const processedWorkers = useMemo(() => {
         return workers.map(w => ({
@@ -321,8 +328,9 @@ export default function ActiveWorkers() {
                                                         className="h-8 w-8 p-0 text-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDelete(worker.id);
+                                                            handleDeleteClick(worker.id);
                                                         }}
+
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
@@ -341,12 +349,25 @@ export default function ActiveWorkers() {
                     isOpen={!!selectedWorker}
                     onClose={() => setSelectedWorker(null)}
                     onUpdate={async (updated) => {
-                        await workerStore.update(updated.id, updated);
                         setWorkers(prev => prev.map(w => w.id === updated.id ? updated : w));
                         if (selectedWorker?.id === updated.id) setSelectedWorker(updated);
                     }}
+
+                />
+                <ConfirmDialog
+                    isOpen={confirmDelete.isOpen}
+                    onClose={() => setConfirmDelete({ ...confirmDelete, isOpen: false })}
+                    onConfirm={handleDeleteConfirm}
+                    title={t('admin_confirm_delete_photo') || t('delete')}
+                    message={t('admin_confirm_delete')}
+                    confirmText={t('delete')}
+                    cancelText={t('cancel')}
+                    variant="danger"
                 />
             </div>
         </AdminLayout>
     );
 }
+
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+

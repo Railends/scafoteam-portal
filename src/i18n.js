@@ -66,8 +66,24 @@ const resources = {
                 "poland": "Poland",
                 "ukraine": "Ukraine",
                 "finland": "Finland",
+                "germany": "Germany",
+                "sweden": "Sweden",
+                "norway": "Norway",
+                "denmark": "Denmark",
+                "romania": "Romania",
+                "bulgaria": "Bulgaria",
+                "hungary": "Hungary",
+                "czech": "Czech Republic",
+                "slovakia": "Slovakia",
+                "france": "France",
+                "spain": "Spain",
+                "italy": "Italy",
+                "uzbekistan": "Uzbekistan",
+                "tajikistan": "Tajikistan",
+                "kazakhstan": "Kazakhstan",
                 "other": "Other"
             },
+
             "durations": {
                 "less_1": "1 Year or less",
                 "1_3": "1-3 Years",
@@ -91,6 +107,8 @@ const resources = {
             "fill_form": "Fill Application Form",
             "admin_login": "Admin",
             "footer_rights": "All rights reserved.",
+            "announcement_text": "We are currently looking for experienced scaffolders and insulators! Apply today.",
+
             // Admin Panel
             "admin_pending_registrations": "Pending Registrations",
             "admin_search_pending": "Search pending...",
@@ -119,7 +137,7 @@ const resources = {
             "admin_project_name_placeholder": "Project name...",
             "admin_select_client": "Select Client",
             "admin_client": "Client",
-            "admin_no_client": "No Client",
+            "admin_no_project": "No Active Project",
             "admin_add": "Add",
             "admin_delete_confirm": "Delete this item?",
             "admin_client_accounts": "Client Accounts",
@@ -136,7 +154,9 @@ const resources = {
             "admin_training": "Training",
             "admin_logout": "Logout",
             "admin_portal": "Admin Portal",
+            "admin_panel": "Admin Panel",
             "admin_login_desc": "Enter your credentials to access the dashboard",
+
             "admin_username": "Username",
             "admin_password": "Password",
             "admin_invalid_credentials": "Invalid credentials",
@@ -246,7 +266,15 @@ const resources = {
             "admin_role": "Role",
             "admin_role_superadmin": "Superadmin",
             "admin_role_admin": "Admin",
-            "admin_admins_desc": "Manage administrative accounts and permissions"
+            "admin_full_name": "Full Name",
+            "admin_settings": "Settings",
+            "admin_admins_desc": "Manage administrative accounts and permissions",
+            "change_password": "Change Password",
+            "new_password": "New Password",
+            "confirm_password": "Confirm Password",
+            "password_rules": "Leave blank to keep current password"
+
+
         }
     },
     lv: {
@@ -313,8 +341,24 @@ const resources = {
                 "poland": "Polija",
                 "ukraine": "Ukraina",
                 "finland": "Somija",
+                "germany": "Vācija",
+                "sweden": "Zviedrija",
+                "norway": "Norvēģija",
+                "denmark": "Dānija",
+                "romania": "Rumānija",
+                "bulgaria": "Bulgārija",
+                "hungary": "Ungārija",
+                "czech": "Čehija",
+                "slovakia": "Slovākija",
+                "france": "Francija",
+                "spain": "Spānija",
+                "italy": "Itālija",
+                "uzbekistan": "Uzbekistāna",
+                "tajikistan": "Tadžikistāna",
+                "kazakhstan": "Kazahstāna",
                 "other": "Cits"
             },
+
             "durations": {
                 "less_1": "1 gads vai mazāk",
                 "1_3": "1-3 gadi",
@@ -338,6 +382,8 @@ const resources = {
             "fill_form": "Aizpildīt pieteikuma formu",
             "admin_login": "Administrators",
             "footer_rights": "Visas tiesības aizsargātas.",
+            "announcement_text": "Scafoteam meklē pieredzējušus sastatņu montētājus un izolētājus! Piesakies tūlīt.",
+
             // Admin Panel
             "admin_pending_registrations": "Gaidāmie pieteikumi",
             "admin_search_pending": "Meklēt pieteikumos...",
@@ -366,7 +412,7 @@ const resources = {
             "admin_project_name_placeholder": "Projekta nosaukums...",
             "admin_select_client": "Izvēlēties klientu",
             "admin_client": "Klients",
-            "admin_no_client": "Nav klienta",
+            "admin_no_project": "Nav piesaistīta projekta",
             "admin_add": "Pievienot",
             "admin_delete_confirm": "Dzēst šo vienību?",
             "admin_client_accounts": "Klientu konti",
@@ -383,7 +429,9 @@ const resources = {
             "admin_training": "Apmācības",
             "admin_logout": "Iziet",
             "admin_portal": "Admin Portāls",
+            "admin_panel": "Vadības panelis",
             "admin_login_desc": "Ievadiet savus piekļuves datus, lai pieslēgtos",
+
             "admin_username": "Lietotājvārds",
             "admin_password": "Parole",
             "admin_invalid_credentials": "Nepareizi piekļuves dati",
@@ -486,7 +534,14 @@ const resources = {
             "admin_edit_admin": "Labot administratoru",
             "admin_role": "Loma",
             "admin_role_superadmin": "Superadministrators",
-            "admin_role_admin": "Administrators"
+            "admin_role_admin": "Administrators",
+            "admin_full_name": "Vārds Uzvārds",
+            "admin_settings": "Iestatījumi",
+            "change_password": "Mainīt paroli",
+            "new_password": "Jaunā parole",
+            "confirm_password": "Apstiprināt jauno paroli",
+            "password_rules": "Atstājiet tukšu, ja nevēlaties mainīt"
+
         }
     },
     ru: {
@@ -553,8 +608,24 @@ const resources = {
                 "poland": "Польша",
                 "ukraine": "Украина",
                 "finland": "Финляндия",
+                "germany": "Германия",
+                "sweden": "Швеция",
+                "norway": "Норвегия",
+                "denmark": "Дания",
+                "romania": "Румыния",
+                "bulgaria": "Болгария",
+                "hungary": "Венгрия",
+                "czech": "Чехия",
+                "slovakia": "Словакия",
+                "france": "Франция",
+                "spain": "Испания",
+                "italy": "Италия",
+                "uzbekistan": "Узбекистан",
+                "tajikistan": "Таджикистан",
+                "kazakhstan": "Казахстан",
                 "other": "Другое"
             },
+
             "durations": {
                 "less_1": "1 год или меньше",
                 "1_3": "1-3 года",
@@ -622,8 +693,12 @@ const resources = {
             "admin_catalogs": "Каталоги продукции",
             "admin_training": "Обучение",
             "admin_logout": "Выйти",
+            "announcement_text": "Scafoteam ищет опытных монтажников лесов и изоляторов! Подайте заявку сегодня.",
+
             "admin_portal": "Админ Портал",
+            "admin_panel": "Панель управления",
             "admin_login_desc": "Введите свои данные для входа",
+
             "admin_username": "Имя пользователя",
             "admin_password": "Пароль",
             "admin_invalid_credentials": "Неверные учетные данные",

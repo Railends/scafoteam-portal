@@ -1,35 +1,53 @@
+import emailjs from '@emailjs/browser';
+
 /**
- * Mock Email Service
+ * Email Service using EmailJS
  * 
- * Since this is a frontend-only application using localStorage, 
- * this service simulates sending emails by logging to the console 
- * and providing a way for the UI to show success notifications.
+ * This service handles sending credentials to workers.
+ * It uses environment variables for configuration.
  */
+
+// Initialize EmailJS with Public Key if available
+const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+if (PUBLIC_KEY) {
+    emailjs.init(PUBLIC_KEY);
+}
 
 export const emailService = {
     /**
-     * Simulates sending a password to a worker
-     * @param {string} email - Recipient email
-     * @param {string} name - Worker name
-     * @param {string} password - Generated password
-     * @returns {Promise<{success: boolean, message: string}>}
+     * Sends a password to a worker using EmailJS
      */
     sendPassword: async (email, name, password) => {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
 
-        console.group('📧 Mock Email Sent');
-        console.log(`To: ${email}`);
-        console.log(`Subject: Jūsu Scafoteam portāla piekļuves dati`);
-        console.log(`Hi ${name},`);
-        console.log(`Jūsu reģistrācija ir apstiprināta!`);
-        console.log(`Jūsu pagaidu parole ir: ${password}`);
-        console.log('---');
-        console.groupEnd();
+        if (!serviceId || !templateId || !PUBLIC_KEY) {
+            console.warn('EmailJS not configured. Falling back to mock logs.');
+            console.group('📧 Mock Email Sent (EmailJS Missing)');
+            console.log(`To: ${email}`);
+            console.log(`Hi ${name}, your password is: ${password}`);
+            console.groupEnd();
+            return { success: true, message: 'Mock email logged' };
+        }
 
-        return {
-            success: true,
-            message: `Parole veiksmīgi nosūtīta uz ${email}`
-        };
+        try {
+            const templateParams = {
+                to_email: email,
+                to_name: name,
+                temp_password: password,
+                reply_to: 'info@scafoteam.fi'
+            };
+
+            const response = await emailjs.send(serviceId, templateId, templateParams);
+
+            return {
+                success: true,
+                message: `E-pasts nosūtīts! (ID: ${response.status})`
+            };
+        } catch (error) {
+            console.error('EmailJS Error:', error);
+            throw new Error('E-pasta sūtīšana neizdevās. Lūdzu, pārbaudiet EmailJS iestatījumus.');
+        }
     }
 };
+

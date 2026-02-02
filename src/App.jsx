@@ -14,32 +14,39 @@ import WorkerLogin from '@/pages/WorkerLogin';
 import WorkerDashboard from '@/pages/WorkerDashboard';
 import DocumentTemplates from '@/pages/admin/DocumentTemplates';
 import AdminManagement from '@/pages/admin/AdminManagement';
+import AdminSettings from '@/pages/admin/AdminSettings';
+
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/register" element={<WorkerRegistration />} />
-        <Route path="/worker/login" element={<WorkerLogin />} />
-        <Route path="/worker/dashboard" element={<ProtectedRoute authKey="workerData" redirect="/worker/login"><WorkerDashboard /></ProtectedRoute>} />
-        <Route path="/admin" element={<AdminLogin />} />
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/register" element={<WorkerRegistration />} />
+          <Route path="/worker/login" element={<WorkerLogin />} />
+          <Route path="/worker/dashboard" element={<ProtectedRoute authKey="workerData" redirect="/worker/login"><WorkerDashboard /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminLogin />} />
 
-        {/* Protected Admin Routes */}
-        <Route path="/admin/dashboard" element={<ProtectedRoute><Navigate to="/admin/dashboard/pending" replace /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/pending" element={<ProtectedRoute><PendingWorkers /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/active" element={<ProtectedRoute><ActiveWorkers /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/clients" element={<ProtectedRoute><ClientAccounts /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/catalogs" element={<ProtectedRoute><ProductCatalogs /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/templates" element={<ProtectedRoute><DocumentTemplates /></ProtectedRoute>} />
-        <Route path="/admin/dashboard/admins" element={<ProtectedRoute><AdminManagement /></ProtectedRoute>} />
-      </Routes>
-    </Router>
+          {/* Protected Admin Routes */}
+          <Route path="/admin/dashboard" element={<ProtectedRoute><Navigate to="/admin/dashboard/pending" replace /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/pending" element={<ProtectedRoute><PendingWorkers /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/active" element={<ProtectedRoute><ActiveWorkers /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/clients" element={<ProtectedRoute><ClientAccounts /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/catalogs" element={<ProtectedRoute><ProductCatalogs /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/templates" element={<ProtectedRoute><DocumentTemplates /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/admins" element={<ProtectedRoute><AdminManagement /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+        </Routes>
+
+      </Router>
+    </ThemeProvider>
   );
 }
 

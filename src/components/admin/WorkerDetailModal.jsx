@@ -234,7 +234,8 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                 onClose();
             }}
             title={t('admin_worker_details')}
-            className="max-w-5xl h-[90vh] flex flex-col"
+            className="max-w-4xl h-[85vh] flex flex-col"
+
         >
             <div className="flex gap-4 mb-6 border-b shrink-0">
                 <button

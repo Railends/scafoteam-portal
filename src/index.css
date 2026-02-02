@@ -50,25 +50,69 @@
 
   /* Scafoteam colors */
   --color-scafoteam-navy: #1a2a44;
-  --color-scafoteam-gold: #fbbf24;
+  --color-scafoteam-gold: #f59e0b;
+  /* More vibrant gold */
+  --color-scafoteam-gold-light: #fbbf24;
   --color-scafoteam-light: #f3f4f6;
-  --color-scafoteam-dark: #111827;
+  --color-scafoteam-dark: #0f172a;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
   --font-sans: 'Inter', sans-serif;
+
+  --animate-slow-zoom: slow-zoom 20s ease-in-out infinite alternate;
+
+  @keyframes slow-zoom {
+    from {
+      transform: scale(1);
+    }
+
+    to {
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+}
+
+@layer utilities {
+  .animate-slow-zoom {
+    animation: var(--animate-slow-zoom);
+  }
+
+  .animate-gradient {
+    animation: gradient 6s linear infinite;
+  }
+
+
+  .text-glow-gold {
+    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+  }
+
+  .bg-glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
 }
 
 @layer base {
   :root {
     --background: 210 20% 98%;
     --foreground: 222 47% 11%;
-
-    /* Scafoteam Gold Base for potential opacity usage if needed */
-    --gold: 38 96% 56%;
-    --gold-foreground: 222 47% 11%;
+    --gold: 38 92% 50%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -95,13 +139,12 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    /* ... define dark mode values if needed ... */
   }
 
   * {
@@ -114,7 +157,15 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-image: radial-gradient(circle at center top, hsl(210 20% 96%) 0%, hsl(210 20% 98%) 100%);
     background-attachment: fixed;
+    transition: background-image 0.5s ease;
+  }
+
+  :root:not(.dark) body {
+    background-image: radial-gradient(circle at center top, hsl(210 20% 96%) 0%, hsl(210 20% 98%) 100%);
+  }
+
+  .dark body {
+    background-image: radial-gradient(circle at center top, #1e293b 0%, #0f172a 100%);
   }
 }

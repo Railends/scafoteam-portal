@@ -7,6 +7,15 @@ const handleSupabaseError = (error, context) => {
     }
 };
 
+
+const mapWorkerFromDB = (w) => {
+    if (!w) return null;
+    return {
+        ...w,
+        adminData: w.admin_data || {},
+    };
+};
+
 export const workerStore = {
     getAll: async () => {
         const { data, error } = await supabase
@@ -14,8 +23,10 @@ export const workerStore = {
             .select('*')
             .order('created_at', { ascending: false });
         handleSupabaseError(error, 'getAllWorkers');
-        return data || [];
+        return (data || []).map(mapWorkerFromDB);
     },
+
+
 
     getById: async (id) => {
         const { data, error } = await supabase
@@ -24,12 +35,57 @@ export const workerStore = {
             .eq('id', id)
             .single();
         if (error && error.code !== 'PGRST116') handleSupabaseError(error, 'getWorkerById');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
+
     add: async (workerData) => {
+        // Map camelCase form fields to snake_case database columns
+        const mapping = {
+            personalId: 'personal_id',
+            hasFinnishId: 'has_finnish_id',
+            finnishId: 'finnish_id',
+            taxNumber: 'tax_number',
+            emergencyName: 'emergency_name',
+            emergencyPhone: 'emergency_phone',
+            hasGreenCard: 'has_green_card',
+            greenCardShow: 'green_card_show',
+            greenCardExpiry: 'green_card_expiry',
+            hasVas: 'has_vas',
+            vcaNumber: 'vca_number',
+            vcaExpiry: 'vca_expiry',
+            hasLicense: 'driving_licence',
+            hasHotworks: 'has_hotworks',
+            hotworksType: 'hotworks_type',
+            hotworksNumber: 'hotworks_number',
+            hotworksExpiry: 'hotworks_expiry',
+            bankAccount: 'bank_account',
+            bicCode: 'bic_code',
+            experienceType: 'experience_type',
+            experienceDuration: 'experience_duration',
+            jacketSize: 'jacket_size',
+            pantsSize: 'pants_size',
+            bootsSize: 'boots_size',
+            referred: 'referred',
+            referredBy: 'referred_by',
+            gdpr: 'gdpr_consent',
+            phonePrefix: 'phone_prefix'
+        };
+
+
+
+
+        const mappedData = {};
+        Object.keys(workerData).forEach(key => {
+            if (mapping[key]) {
+                mappedData[mapping[key]] = workerData[key];
+            } else {
+                mappedData[key] = workerData[key];
+            }
+        });
+
         const newWorker = {
-            ...workerData,
+            ...mappedData,
             status: 'pending',
             admin_data: {
                 project: '',
@@ -46,37 +102,41 @@ export const workerStore = {
             contracts: [],
             folders: []
         };
+
+        // Filter out keys that might not exist in the DB yet if we are unsure
+        // But for now, we'll try to insert and catch errors.
+
         const { data, error } = await supabase
             .from('workers')
             .insert([newWorker])
             .select()
             .single();
         handleSupabaseError(error, 'addWorker');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
-    update: async (id, updates) => {
-        // Renaming camelCase to snake_case for DB columns if necessary, 
-        // but since we keep admin_data as jsonb, we just map key fields if outside JSONB.
-        // Actually, our table has snake_case columns. We must map updates carefully.
-        // Or, we rely on the fact we send whatever we have. 
-        // Important: adminData -> admin_data mapping.
 
+
+    update: async (id, updates) => {
         const payload = { ...updates };
-        if (payload.adminData) {
-            // Merge with existing admin_data
+
+        // Handle adminData mapping and password obfuscation
+        if (payload.adminData || payload.admin_data) {
+            const incomingAdminData = payload.adminData || payload.admin_data;
+
+            // Fetch current to merge
             const { data: current } = await supabase.from('workers').select('admin_data').eq('id', id).single();
             const currentAdminData = current?.admin_data || {};
 
             // Password obfuscation logic
-            if (payload.adminData.password) {
-                const pass = payload.adminData.password;
+            if (incomingAdminData.password) {
+                const pass = incomingAdminData.password;
                 if (!pass.startsWith('obf:')) {
-                    payload.adminData.password = 'obf:' + btoa(pass);
+                    incomingAdminData.password = 'obf:' + btoa(pass);
                 }
             }
 
-            payload.admin_data = { ...currentAdminData, ...payload.adminData };
+            payload.admin_data = { ...currentAdminData, ...incomingAdminData };
             delete payload.adminData;
         }
 
@@ -87,8 +147,9 @@ export const workerStore = {
             .select()
             .single();
         handleSupabaseError(error, 'updateWorker');
-        return data;
+        return mapWorkerFromDB(data);
     },
+
 
     generatePassword: () => {
         return Math.floor(100000 + Math.random() * 900000).toString();

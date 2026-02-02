@@ -15,8 +15,9 @@ const Input = React.forwardRef(({ className, error, type, ...props }, ref) => {
                 {...props}
             />
             {error && (
-                <span className="text-xs text-red-500 mt-1 absolute -bottom-5 left-0">{error}</span>
+                <span className="text-xs text-red-500 mt-1.5 block animate-in fade-in slide-in-from-top-1 font-medium">{error}</span>
             )}
+
         </div>
     );
 });
