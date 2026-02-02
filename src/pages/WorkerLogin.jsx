@@ -22,9 +22,10 @@ export default function WorkerLogin() {
             sessionStorage.setItem('workerData', JSON.stringify(worker));
             navigate('/worker/dashboard');
         } else {
-            setError('Invalid credentials or account not active');
+            setError(t('login_failed_security_update') || 'Invalid credentials or account transition required. Please contact admin.');
         }
     };
+
 
     return (
         <Layout className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -46,8 +47,9 @@ export default function WorkerLogin() {
                         )}
                         <div className="space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">{t('email')} / {t('personal_id')}</label>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">{t('email')}</label>
                                 <div className="relative">
+
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                     <Input
                                         className="pl-11 h-14 bg-gray-50 border-gray-100 rounded-xl font-bold focus:bg-white transition-all"

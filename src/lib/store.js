@@ -84,8 +84,28 @@ export const workerStore = {
             }
         });
 
+        // Generate temporary password for the new worker
+        const password = this.generatePassword();
+
+        // 1. Create Auth User
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: workerData.email,
+            password: password,
+            options: {
+                data: {
+                    role: 'worker'
+                }
+            }
+        });
+
+        if (authError) {
+            console.error('Auth Sign Up Error:', authError);
+            throw authError;
+        }
+
         const newWorker = {
             ...mappedData,
+            user_id: authData.user.id,
             status: 'pending',
             admin_data: {
                 project: '',
@@ -103,17 +123,20 @@ export const workerStore = {
             folders: []
         };
 
-        // Filter out keys that might not exist in the DB yet if we are unsure
-        // But for now, we'll try to insert and catch errors.
-
         const { data, error } = await supabase
             .from('workers')
             .insert([newWorker])
             .select()
             .single();
+
         handleSupabaseError(error, 'addWorker');
-        return mapWorkerFromDB(data);
+
+        // Log the registration
+        await this.logAction(data.id, 'REGISTER', { email: workerData.email });
+
+        return { ...mapWorkerFromDB(data), temporaryPassword: password };
     },
+
 
 
 
@@ -281,43 +304,54 @@ export const workerStore = {
     },
 
     login: async (identifier, password) => {
-        // Check email/personal_id match first
-        // Since we store password inside JSONB admin_data or we can check against specific worker logic
-        // This is complex because we need to decrypt password or check hash.
-        // For now, fetch the user by identifier and check password locally (secure enough for MVP? NO).
-        // But since we are client-side only... 
-
-        const { data: workers, error } = await supabase
-            .from('workers')
-            .select('*')
-            .or(`email.eq.${identifier},personal_id.eq.${identifier}`); // We might need to filter admin_data->portalLogin via Rpc or fetch and filter
-
-        if (error) handleSupabaseError(error, 'workerLogin');
-
-        // Find correct worker (handling the admin_data->portalLogin case manually if query above missed it)
-        // Actually the OR syntax above covers email/personalId. PortalLogin is in JSONB, tricky to query directly without index.
-        // Let's fetch active workers and filter. (Not scalable, but works for <1000 users).
-
-        const { data: allActive } = await supabase.from('workers').select('*').eq('status', 'active');
-        const found = allActive?.find(w => {
-            const login = w.admin_data?.portalLogin || w.email;
-            const isMatch = (w.email === identifier || w.personal_id === identifier || login === identifier);
-            if (!isMatch) return false;
-
-            const storedPass = w.admin_data?.password;
-            let actualPass = storedPass;
-            if (storedPass && storedPass.startsWith('obf:')) {
-                try {
-                    actualPass = atob(storedPass.substring(4));
-                } catch (e) {
-                    actualPass = storedPass;
-                }
-            }
-            return actualPass === password;
+        // First try standard Supabase Auth login
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: identifier,
+            password: password
         });
 
-        return found;
+        if (error) {
+            console.warn('Auth Login Failed:', error.message);
+            return null;
+        }
+
+        // If auth succeeded, fetch the associated worker record
+        const { data: worker, error: workerError } = await supabase
+            .from('workers')
+            .select('*')
+            .eq('user_id', data.user.id)
+            .single();
+
+        if (workerError) {
+            console.error('Worker Record Fetch Failed:', workerError);
+            return null;
+        }
+
+        // Log successful login
+        await this.logAction(worker.id, 'LOGIN', { method: 'AUTH' });
+
+        return mapWorkerFromDB(worker);
+    },
+
+    logAction: async (workerId, action, details = {}) => {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        try {
+            await supabase.from('audit_logs').insert({
+                user_id: user?.id,
+                action: action,
+                details: {
+                    worker_id: workerId,
+                    ...details,
+                    timestamp: new Date().toISOString()
+                },
+                ip_address: 'client-side' // IP fetching is limited on client, but we can add more context here if needed
+            });
+        } catch (e) {
+            console.error('Logging failed:', e);
+        }
     }
+
 };
 
 export const projectStore = {

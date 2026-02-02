@@ -53,9 +53,15 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                 setProjects(projects);
                 const templates = (await templateStore.getAll()) || [];
                 setAvailableTemplates(templates);
+
+                // GDPR Audit Log: Log that admin viewed this worker
+                workerStore.logAction(worker.id, 'VIEW_WORKER_DETAILS', {
+                    workerName: `${worker.name} ${worker.surname}`
+                });
             }
         };
         loadData();
+
     }, [worker]);
 
     const [isSaved, setIsSaved] = useState(false);
