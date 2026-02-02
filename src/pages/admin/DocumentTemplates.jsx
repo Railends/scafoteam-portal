@@ -15,7 +15,11 @@ export default function DocumentTemplates() {
     const [copiedKey, setCopiedKey] = useState(null);
 
     useEffect(() => {
-        setTemplates(templateStore.getAll());
+        const loadTemplates = async () => {
+            const data = await templateStore.getAll();
+            setTemplates(data || []);
+        };
+        loadTemplates();
     }, []);
 
     const handleFileChange = (e) => {
@@ -26,21 +30,24 @@ export default function DocumentTemplates() {
         if (!newTemplateName || !selectedFile) return;
 
         const reader = new FileReader();
-        reader.onloadend = () => {
-            const added = templateStore.add(newTemplateName, reader.result);
-            setTemplates(prev => [...prev, added]);
-            setNewTemplateName('');
-            setSelectedFile(null);
-            // Clear file input
-            const input = document.getElementById('template-upload');
-            if (input) input.value = '';
+        reader.onloadend = async () => {
+            const content = reader.result;
+            const added = await templateStore.add(newTemplateName, content);
+            if (added) {
+                setTemplates(prev => [...prev, added]);
+                setNewTemplateName('');
+                setSelectedFile(null);
+                // Clear file input
+                const input = document.getElementById('template-upload');
+                if (input) input.value = '';
+            }
         };
         reader.readAsDataURL(selectedFile);
     };
 
-    const handleDeleteTemplate = (id) => {
+    const handleDeleteTemplate = async (id) => {
         if (window.confirm(t('admin_delete_confirm'))) {
-            templateStore.delete(id);
+            await templateStore.delete(id);
             setTemplates(prev => prev.filter(t => t.id !== id));
         }
     };
