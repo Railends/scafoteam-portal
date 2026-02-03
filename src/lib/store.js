@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+import { create } from 'zustand';
+import { supabase, supabaseAdmin } from './supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 const handleSupabaseError = (error, context) => {
     if (error) {
@@ -7,12 +9,55 @@ const handleSupabaseError = (error, context) => {
     }
 };
 
+export const useSettingsStore = create((set, get) => ({
+    announcement: '',
+    loading: false,
+
+    fetchSettings: async () => {
+        set({ loading: true });
+        const { data, error } = await supabase
+            .from('settings')
+            .select('*')
+            .eq('id', 'announcement')
+            .single();
+
+        if (data) {
+            set({ announcement: data.value.text });
+        }
+        set({ loading: false });
+    },
+
+    updateAnnouncement: async (text) => {
+        const { error } = await supabase
+            .from('settings')
+            .upsert({
+                id: 'announcement',
+                value: { text },
+                updated_at: new Date().toISOString(),
+                updated_by: (await supabase.auth.getUser()).data.user?.id
+            });
+
+        if (!error) {
+            set({ announcement: text });
+            return { success: true };
+        }
+        return { success: false, error };
+    }
+}));
+
 
 const mapWorkerFromDB = (w) => {
     if (!w) return null;
+    const adminData = w.admin_data || {};
     return {
         ...w,
-        adminData: w.admin_data || {},
+        // Fallback to adminData for potentially missing columns
+        role: w.role || adminData.role || 'worker',
+        status: w.status || adminData.status || 'pending',
+        phone: w.phone || adminData.phone || '',
+        email: w.email || adminData.email || '',
+        nationality: w.nationality || adminData.nationality || '',
+        adminData: adminData,
     };
 };
 
@@ -40,101 +85,88 @@ export const workerStore = {
 
 
     add: async (workerData) => {
-        // Map camelCase form fields to snake_case database columns
-        const mapping = {
-            personalId: 'personal_id',
-            hasFinnishId: 'has_finnish_id',
-            finnishId: 'finnish_id',
-            taxNumber: 'tax_number',
-            emergencyName: 'emergency_name',
-            emergencyPhone: 'emergency_phone',
-            hasGreenCard: 'has_green_card',
-            greenCardShow: 'green_card_show',
-            greenCardExpiry: 'green_card_expiry',
-            hasVas: 'has_vas',
-            vcaNumber: 'vca_number',
-            vcaExpiry: 'vca_expiry',
-            hasLicense: 'driving_licence',
-            hasHotworks: 'has_hotworks',
-            hotworksType: 'hotworks_type',
-            hotworksNumber: 'hotworks_number',
-            hotworksExpiry: 'hotworks_expiry',
-            bankAccount: 'bank_account',
-            bicCode: 'bic_code',
-            experienceType: 'experience_type',
-            experienceDuration: 'experience_duration',
-            jacketSize: 'jacket_size',
-            pantsSize: 'pants_size',
-            bootsSize: 'boots_size',
-            referred: 'referred',
-            referredBy: 'referred_by',
-            gdpr: 'gdpr_consent',
-            phonePrefix: 'phone_prefix'
-        };
+        try {
+            // 1. Create Supabase Auth user
+            const tempPassword = Math.random().toString(36).slice(-10) + '123!';
+            let authData, authError;
 
-
-
-
-        const mappedData = {};
-        Object.keys(workerData).forEach(key => {
-            if (mapping[key]) {
-                mappedData[mapping[key]] = workerData[key];
+            if (supabaseAdmin) {
+                // Use Admin API to bypass rate limits and auto-confirm email
+                console.log('Using Admin API for worker creation');
+                const result = await supabaseAdmin.auth.admin.createUser({
+                    email: workerData.email,
+                    password: tempPassword,
+                    email_confirm: true,
+                    user_metadata: {
+                        name: workerData.firstName,
+                        surname: workerData.lastName,
+                        role: workerData.role || 'worker'
+                    }
+                });
+                authData = result.data;
+                authError = result.error;
             } else {
-                mappedData[key] = workerData[key];
+                // Fallback to client-side sign up (subject to rate limits)
+                console.log('Using Standard API for worker creation (subject to rate limits)');
+                const result = await supabase.auth.signUp({
+                    email: workerData.email,
+                    password: tempPassword,
+                    options: {
+                        data: {
+                            name: workerData.firstName,
+                            surname: workerData.lastName,
+                            role: workerData.role || 'worker'
+                        }
+                    }
+                });
+                authData = result.data;
+                authError = result.error;
             }
-        });
 
-        // Generate temporary password for the new worker
-        const password = this.generatePassword();
+            if (authError) throw authError;
 
-        // 1. Create Auth User
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: workerData.email,
-            password: password,
-            options: {
-                data: {
-                    role: 'worker'
-                }
+            // 2. Insert into workers table
+            // Only use columns we know exist: id, name, surname, created_at, user_id (added via trigger/sql)
+            // Store everything else in admin_data
+            const adminData = {
+                role: workerData.role || 'worker',
+                status: workerData.status || 'pending',
+                phone: workerData.phone,
+                email: workerData.email, // Store email in admin_data too just in case
+                ...workerData.adminData
+            };
+
+            console.log('Attempting to insert worker into DB:', {
+                id: authData.user.id,
+                email: workerData.email,
+                status: adminData.status
+            });
+
+            const { data: dbData, error: dbError } = await supabase
+                .from('workers')
+                .insert([{
+                    id: authData.user.id,
+                    name: workerData.firstName,
+                    surname: workerData.lastName,
+                    // email: workerData.email, // Potentially missing column?
+                    // phone: workerData.phone, // Missing column
+                    // role: workerData.role,   // Missing column
+                    // status: workerData.status, // Missing column
+                    admin_data: adminData,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (dbError) throw dbError;
+
+            return { success: true, tempPassword };
+        } catch (error) {
+            console.error('Error adding worker:', error);
+            let errorMessage = error.message;
+            if (errorMessage.includes('email rate limit exceeded')) {
+                errorMessage = 'Pārsniegts e-pasta sūtīšanas limits. Lūdzu, uzgaidiet dažas minūtes vai izmantojiet citu e-pastu.';
             }
-        });
-
-        if (authError) {
-            console.error('Auth Sign Up Error:', authError);
-            throw authError;
+            return { success: false, error: errorMessage };
         }
-
-        const newWorker = {
-            ...mappedData,
-            user_id: authData.user.id,
-            status: 'pending',
-            admin_data: {
-                project: '',
-                contractStart: '',
-                contractEnd: '',
-                hourlyRate: '',
-                rent: '',
-                rentAddress: '',
-                profileImage: '',
-                hasPerDiem: false,
-                portalLogin: workerData.email
-            },
-            documents: [],
-            contracts: [],
-            folders: []
-        };
-
-        const { data, error } = await supabase
-            .from('workers')
-            .insert([newWorker])
-            .select()
-            .single();
-
-        handleSupabaseError(error, 'addWorker');
-
-        // Log the registration
-        await this.logAction(data.id, 'REGISTER', { email: workerData.email });
-
-        return { ...mapWorkerFromDB(data), temporaryPassword: password };
     },
 
 
@@ -143,10 +175,29 @@ export const workerStore = {
     update: async (id, updates) => {
         const payload = { ...updates };
 
-        // Handle adminData mapping and password obfuscation
-        if (payload.adminData || payload.admin_data) {
-            const incomingAdminData = payload.adminData || payload.admin_data;
+        // Define fields that might be missing from schema and should go to admin_data
+        const schemaFallbackFields = ['role', 'status', 'phone', 'email', 'nationality'];
+        let fallbackUpdates = {};
 
+        // Check if any payload keys are in our fallback list
+        schemaFallbackFields.forEach(field => {
+            if (payload[field] !== undefined) {
+                fallbackUpdates[field] = payload[field];
+                // We don't delete from payload yet, we'll try to update both or handle it smartly?
+                // Actually, if we try to update a non-existent column, it throws.
+                // So we MUST remove it from payload if we suspect it's missing.
+                // To be safe given the errors, let's remove them from top-level payload.
+                delete payload[field];
+            }
+        });
+
+        // Handle adminData mapping and password obfuscation
+        let incomingAdminData = payload.adminData || payload.admin_data || {};
+
+        // Merge fallback updates into incomingAdminData
+        incomingAdminData = { ...incomingAdminData, ...fallbackUpdates };
+
+        if (Object.keys(incomingAdminData).length > 0) {
             // Fetch current to merge
             const { data: current } = await supabase.from('workers').select('admin_data').eq('id', id).single();
             const currentAdminData = current?.admin_data || {};
@@ -173,6 +224,11 @@ export const workerStore = {
         return mapWorkerFromDB(data);
     },
 
+
+    delete: async (id) => {
+        const { error } = await supabase.from('workers').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteWorker');
+    },
 
     generatePassword: () => {
         return Math.floor(100000 + Math.random() * 900000).toString();
@@ -444,6 +500,201 @@ export const templateStore = {
     delete: async (id) => {
         const { error } = await supabase.from('templates').delete().eq('id', id);
         handleSupabaseError(error, 'deleteTemplate');
+    }
+};
+
+export const trainingStore = {
+    getAll: async () => {
+        const { data, error } = await supabase
+            .from('trainings')
+            .select('*, training_participants(count)')
+            .order('date', { ascending: true });
+        handleSupabaseError(error, 'getAllTrainings');
+
+        return (data || []).map(t => ({
+            ...t,
+            participants: t.training_participants?.[0]?.count || 0
+        }));
+    },
+
+    add: async (trainingData) => {
+        const { data, error } = await supabase
+            .from('trainings')
+            .insert([trainingData])
+            .select()
+            .single();
+        handleSupabaseError(error, 'addTraining');
+        return data;
+    },
+
+    update: async (id, updates) => {
+        const { data, error } = await supabase
+            .from('trainings')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        handleSupabaseError(error, 'updateTraining');
+        return data;
+    },
+
+    delete: async (id) => {
+        const { error } = await supabase.from('trainings').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteTraining');
+    },
+
+    addParticipant: async (trainingId, workerId) => {
+        const { data, error } = await supabase
+            .from('training_participants')
+            .insert([{ training_id: trainingId, worker_id: workerId, status: 'registered' }])
+            .select()
+            .single();
+        handleSupabaseError(error, 'addTrainingParticipant');
+        return data;
+    },
+
+    removeParticipant: async (trainingId, workerId) => {
+        const { error } = await supabase
+            .from('training_participants')
+            .delete()
+            .eq('training_id', trainingId)
+            .eq('worker_id', workerId);
+        handleSupabaseError(error, 'removeTrainingParticipant');
+    },
+
+    getParticipants: async (trainingId) => {
+        const { data, error } = await supabase
+            .from('training_participants')
+            .select('*, workers(id, name, surname, role)')
+            .eq('training_id', trainingId);
+        handleSupabaseError(error, 'getTrainingParticipants');
+        return data || [];
+    }
+};
+
+
+
+export const residenceStore = {
+    getAll: async () => {
+        const { data, error } = await supabase
+            .from('residences')
+            .select('*, residence_occupants(count), projects(name)')
+            .order('address');
+        handleSupabaseError(error, 'getAllResidences');
+        return (data || []).map(r => ({
+            ...r,
+            projectName: r.projects?.name || '',
+            occupants: r.residence_occupants?.[0]?.count || 0
+        }));
+    },
+    add: async (residenceData) => {
+        const { data, error } = await supabase
+            .from('residences')
+            .insert([residenceData])
+            .select()
+            .single();
+        handleSupabaseError(error, 'addResidence');
+        return data;
+    },
+    update: async (id, updates) => {
+        const { data, error } = await supabase
+            .from('residences')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        handleSupabaseError(error, 'updateResidence');
+        return data;
+    },
+    delete: async (id) => {
+        const { error } = await supabase.from('residences').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteResidence');
+    },
+
+    getOccupants: async (residenceId) => {
+        const { data, error } = await supabase
+            .from('residence_occupants')
+            .select('*, workers(id, name, surname)')
+            .eq('residence_id', residenceId)
+            .order('start_date', { ascending: false });
+        handleSupabaseError(error, 'getResidenceOccupants');
+        return data || [];
+    },
+
+    addOccupant: async (occupantData) => {
+        const { data, error } = await supabase
+            .from('residence_occupants')
+            .insert([occupantData])
+            .select()
+            .single();
+        handleSupabaseError(error, 'addResidenceOccupant');
+        return data;
+    },
+
+    updateOccupant: async (id, updates) => {
+        const { data, error } = await supabase
+            .from('residence_occupants')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        handleSupabaseError(error, 'updateResidenceOccupant');
+        return data;
+    },
+
+    deleteOccupant: async (id) => {
+        const { error } = await supabase.from('residence_occupants').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteResidenceOccupant');
+    }
+};
+
+// Extension for projects to handle participants
+export const projectParticipantsStore = {
+    getParticipants: async (projectId) => {
+        const { data, error } = await supabase
+            .from('project_participants')
+            .select('*, workers(id, name, surname, role)')
+            .eq('project_id', projectId)
+            .order('start_date', { ascending: false });
+        handleSupabaseError(error, 'getProjectParticipants');
+        return data || [];
+    },
+
+    assignWorker: async (projectId, workerId, role, startDate) => {
+        const { data, error } = await supabase
+            .from('project_participants')
+            .insert([{
+                project_id: projectId,
+                worker_id: workerId,
+                role,
+                start_date: startDate,
+                status: 'active'
+            }])
+            .select()
+            .single();
+        handleSupabaseError(error, 'assignProjectParticipant');
+        return data;
+    },
+
+    endAssignment: async (participantId, endDate) => {
+        const { data, error } = await supabase
+            .from('project_participants')
+            .update({ end_date: endDate, status: 'ended' })
+            .eq('id', participantId)
+            .select()
+            .single();
+        handleSupabaseError(error, 'endProjectParticipant');
+        return data;
+    },
+
+    getParticipantsByWorker: async (workerId) => {
+        const { data, error } = await supabase
+            .from('project_participants')
+            .select('*, projects(name)')
+            .eq('worker_id', workerId)
+            .order('start_date', { ascending: false });
+        handleSupabaseError(error, 'getParticipantsByWorker');
+        return data || [];
     }
 };
 

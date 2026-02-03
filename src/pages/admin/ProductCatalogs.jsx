@@ -71,7 +71,8 @@ export default function ProductCatalogs() {
                                 <Button size="sm" variant="outline" className="flex-1">
                                     <FileText className="w-4 h-4 mr-2" /> {t('admin_view')}
                                 </Button>
-                                <Button size="sm" className="bg-scafoteam-gold hover:bg-yellow-500 text-scafoteam-navy">
+                                <Button size="sm" className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white">
+
                                     <Download className="w-4 h-4" />
                                 </Button>
                             </div>

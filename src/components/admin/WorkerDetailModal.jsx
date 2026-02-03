@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { workerStore, projectStore, templateStore } from '@/lib/store';
+import { workerStore, projectStore, templateStore, projectParticipantsStore } from '@/lib/store';
 import { emailService } from '@/lib/emailService';
 import { docGenerator } from '@/lib/docGenerator';
 import { FileText, Upload, Trash2, Download, Save, Check, User, Mail, Phone, Calendar, Globe, CreditCard, ShieldCheck, MapPin, Folder, FolderPlus, RefreshCw, Loader2, Wand2, X } from 'lucide-react';
@@ -14,22 +14,29 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('profile'); // profile, admin, contracts, documents
     const [projects, setProjects] = useState([]);
+    const [projectHistory, setProjectHistory] = useState([]);
     const [currentFolderId, setCurrentFolderId] = useState(null);
     const [isResetting, setIsResetting] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
-    const [adminFormData, setAdminFormData] = useState({
-        project: '',
-        hourlyRate: '',
-        contractStart: '',
-        contractEnd: '',
-        rentAddress: '',
-        rentPrice: '',
-        profileImage: '',
-        hasPerDiem: false,
-        password: '',
-        portalLogin: ''
+    const [formData, setFormData] = useState({
+        // Profile Data
+        name: '', surname: '', email: '', phone: '',
+        nationality: '', personalId: '', finnishId: '', taxNumber: '',
+        address: '', bankAccount: '', bicCode: '',
+        experienceType: '', drivingLicence: '',
+        hasGreenCard: 'no', greenCardShow: '', greenCardExpiry: '',
+        hasVas: 'no', hasHotworks: 'no', hotworksType: '', hotworksExpiry: '',
+
+        // Admin Data
+        project: '', hourlyRate: '', hasPerDiem: false,
+        rentAddress: '', rentPrice: '',
+        contractStart: '', contractEnd: '',
+        profileImage: '', password: '', portalLogin: '',
+
+        // Sizes
+        bootSize: '', jacketSize: '', trouserSize: ''
     });
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [availableTemplates, setAvailableTemplates] = useState([]);
@@ -37,22 +44,51 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
     useEffect(() => {
         const loadData = async () => {
             if (worker) {
-                setAdminFormData({
+                setFormData({
+                    name: worker.name || '',
+                    surname: worker.surname || '',
+                    email: worker.email || '',
+                    phone: worker.phone || '',
+                    nationality: worker.nationality || '',
+                    personalId: worker.personalId || (worker.adminData?.personalId || ''),
+                    finnishId: worker.finnishId || (worker.adminData?.finnishId || ''),
+                    taxNumber: worker.taxNumber || (worker.adminData?.taxNumber || ''),
+                    address: worker.address || (worker.adminData?.address || ''),
+                    bankAccount: worker.bankAccount || (worker.adminData?.bankAccount || ''),
+                    bicCode: worker.bicCode || (worker.adminData?.bicCode || ''),
+                    experienceType: worker.experienceType || '',
+                    drivingLicence: worker.drivingLicence || (worker.adminData?.drivingLicence || ''),
+                    hasGreenCard: worker.hasGreenCard || (worker.adminData?.hasGreenCard || 'no'),
+                    greenCardShow: worker.greenCardShow || '',
+                    greenCardExpiry: worker.greenCardExpiry || '',
+                    hasVas: worker.hasVas || (worker.adminData?.hasVas || 'no'),
+                    hasHotworks: worker.hasHotworks || '',
+                    hotworksType: worker.hotworksType || '',
+                    hotworksExpiry: worker.hotworksExpiry || '',
+
                     project: worker.adminData?.project || '',
                     hourlyRate: worker.adminData?.hourlyRate || '',
-                    contractStart: worker.adminData?.contractStart || '',
-                    contractEnd: worker.adminData?.contractEnd || '',
+                    hasPerDiem: worker.adminData?.hasPerDiem || false,
                     rentAddress: worker.adminData?.rentAddress || '',
                     rentPrice: worker.adminData?.rentPrice || '',
+                    contractStart: worker.adminData?.contractStart || '',
+                    contractEnd: worker.adminData?.contractEnd || '',
                     profileImage: worker.adminData?.profileImage || '',
-                    hasPerDiem: worker.adminData?.hasPerDiem || false,
                     password: worker.adminData?.password || '',
-                    portalLogin: worker.adminData?.portalLogin || worker.email || ''
+                    portalLogin: worker.adminData?.portalLogin || worker.email || '',
+
+                    bootSize: worker.adminData?.bootSize || '',
+                    jacketSize: worker.adminData?.jacketSize || '',
+                    trouserSize: worker.adminData?.trouserSize || ''
                 });
                 const projects = (await projectStore.getAll()) || [];
                 setProjects(projects);
                 const templates = (await templateStore.getAll()) || [];
                 setAvailableTemplates(templates);
+
+                // Load Project History
+                const history = await projectParticipantsStore.getParticipantsByWorker(worker.id);
+                setProjectHistory(history);
 
                 // GDPR Audit Log: Log that admin viewed this worker
                 workerStore.logAction(worker.id, 'VIEW_WORKER_DETAILS', {
@@ -68,8 +104,51 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
 
     if (!worker) return null;
 
-    const handleSaveAdminData = async () => {
-        const updatedWorker = await workerStore.update(worker.id, { adminData: adminFormData });
+    const handleSave = async () => {
+        // Construct payload
+        // Top level fields
+        const payload = {
+            name: formData.name,
+            surname: formData.surname,
+            email: formData.email,
+            phone: formData.phone,
+            nationality: formData.nationality,
+            // Admin Data structure
+            adminData: {
+                project: formData.project,
+                hourlyRate: formData.hourlyRate,
+                hasPerDiem: formData.hasPerDiem,
+                rentAddress: formData.rentAddress,
+                rentPrice: formData.rentPrice,
+                contractStart: formData.contractStart,
+                contractEnd: formData.contractEnd,
+                profileImage: formData.profileImage,
+                password: formData.password,
+                portalLogin: formData.portalLogin,
+
+                // Store sensitive/extra fields in adminData for safety if columns don't exist
+                personalId: formData.personalId,
+                finnishId: formData.finnishId,
+                taxNumber: formData.taxNumber,
+                bankAccount: formData.bankAccount,
+                bicCode: formData.bicCode,
+                address: formData.address,
+                drivingLicence: formData.drivingLicence,
+                hasGreenCard: formData.hasGreenCard,
+                greenCardShow: formData.greenCardShow,
+                greenCardExpiry: formData.greenCardExpiry,
+                hasVas: formData.hasVas,
+                hasHotworks: formData.hasHotworks,
+                hotworksType: formData.hotworksType,
+                hotworksExpiry: formData.hotworksExpiry,
+
+                bootSize: formData.bootSize,
+                jacketSize: formData.jacketSize,
+                trouserSize: formData.trouserSize
+            }
+        };
+
+        const updatedWorker = await workerStore.update(worker.id, payload);
         onUpdate(updatedWorker);
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 3000);
@@ -131,19 +210,24 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
 
         const reader = new FileReader();
         reader.onloadend = async () => {
-            const updatedData = { ...adminFormData, profileImage: reader.result };
-            setAdminFormData(updatedData);
-            const updatedWorker = await workerStore.update(worker.id, { adminData: updatedData });
-            onUpdate(updatedWorker);
+            reader.onloadend = async () => {
+                const updatedData = { ...formData, profileImage: reader.result };
+                setFormData(updatedData);
+                // Auto save on upload
+                const payload = { adminData: { ...worker.adminData, profileImage: reader.result } };
+                const updatedWorker = await workerStore.update(worker.id, payload);
+                onUpdate(updatedWorker);
+            };
         };
         reader.readAsDataURL(file);
     };
 
     const handleDeletePhoto = async () => {
         if (window.confirm(t('admin_confirm_delete_photo'))) {
-            const updatedData = { ...adminFormData, profileImage: '' };
-            setAdminFormData(updatedData);
-            const updatedWorker = await workerStore.update(worker.id, { adminData: updatedData });
+            const updatedData = { ...formData, profileImage: '' };
+            setFormData(updatedData);
+            const payload = { adminData: { ...worker.adminData, profileImage: '' } };
+            const updatedWorker = await workerStore.update(worker.id, payload);
             onUpdate(updatedWorker);
         }
     };
@@ -223,14 +307,7 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
         </div>
     );
 
-    const DataField = ({ label, value }) => (
-        <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{label}</label>
-            <div className="text-sm font-bold text-scafoteam-navy min-h-[20px]">
-                {value || '---'}
-            </div>
-        </div>
-    );
+
 
     return (
         <Modal
@@ -268,6 +345,12 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                 >
                     {t('admin_personal_documents')}
                 </button>
+                <button
+                    className={cn("pb-2 px-1 font-bold transition-colors text-sm", activeTab === 'history' ? 'text-scafoteam-navy border-b-2 border-scafoteam-navy' : 'text-gray-400')}
+                    onClick={() => setActiveTab('history')}
+                >
+                    Vēsture
+                </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-1 custom-scrollbar">
@@ -280,9 +363,9 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     {t('admin_profile_photo_label')}
                                 </label>
                                 <div className="relative aspect-[3/4] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 overflow-hidden group">
-                                    {adminFormData.profileImage ? (
+                                    {formData.profileImage ? (
                                         <>
-                                            <img src={adminFormData.profileImage} alt="" className="w-full h-full object-cover" />
+                                            <img src={formData.profileImage} alt="" className="w-full h-full object-cover" />
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -320,12 +403,30 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     {t('admin_personal_info')}
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                                    <DataField label={t('name')} value={worker.name} />
-                                    <DataField label={t('surname')} value={worker.surname} />
-                                    <DataField label={t('nationality')} value={worker.nationality} />
-                                    <DataField label={t('personal_id')} value={worker.personalId} />
-                                    <DataField label={t('finnish_id')} value={worker.finnishId} />
-                                    <DataField label={t('tax_number')} value={worker.taxNumber} />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('name')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('surname')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.surname} onChange={e => setFormData({ ...formData, surname: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('nationality')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('personal_id')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.personalId} onChange={e => setFormData({ ...formData, personalId: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('finnish_id')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.finnishId} onChange={e => setFormData({ ...formData, finnishId: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('tax_number')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.taxNumber} onChange={e => setFormData({ ...formData, taxNumber: e.target.value })} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -335,11 +436,26 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     {t('admin_contact_bank')}
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                                    <DataField label={t('email')} value={worker.email} />
-                                    <DataField label={t('phone')} value={worker.phone} />
-                                    <DataField label={t('address')} value={worker.address} />
-                                    <DataField label={t('bank_account')} value={worker.bankAccount} />
-                                    <DataField label={t('bic_code')} value={worker.bicCode} />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('email')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('phone')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('address')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('bank_account')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.bankAccount} onChange={e => setFormData({ ...formData, bankAccount: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('bic_code')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.bicCode} onChange={e => setFormData({ ...formData, bicCode: e.target.value })} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -349,20 +465,94 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     {t('experience_type')} & {t('admin_certificates')}
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                                    <DataField label={t('experience_type')} value={`${worker.experienceType || ''} (${worker.experienceDuration || ''})`} />
-                                    <DataField label={t('admin_drivers_licence')} value={String(worker.drivingLicence || '')} />
-                                    <DataField label={t('green_card')} value={worker.hasGreenCard === 'yes' ? `${worker.greenCardShow || ''} (Exp: ${worker.greenCardExpiry || ''})` : t('no')} />
-                                    <DataField label={t('vca_card')} value={worker.hasVas === 'yes' ? t('yes') : t('no')} />
-                                    <DataField label={t('hotworks_as1')} value={worker.hasHotworks === 'yes' ? `${String(worker.hotworksType || '').toUpperCase()} (Exp: ${worker.hotworksExpiry || ''})` : t('no')} />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('experience_type')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.experienceType} onChange={e => setFormData({ ...formData, experienceType: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_drivers_licence')}</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.drivingLicence} onChange={e => setFormData({ ...formData, drivingLicence: e.target.value })} />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('green_card')}</label>
+                                        <div className="flex gap-2">
+                                            <Select className="h-8 w-24" value={formData.hasGreenCard} onChange={e => setFormData({ ...formData, hasGreenCard: e.target.value })} options={[{ value: 'yes', label: t('yes') }, { value: 'no', label: t('no') }]} />
+                                            {formData.hasGreenCard === 'yes' && (
+                                                <Input className="h-8 flex-1" placeholder="Card Number / Expiry" value={formData.greenCardShow} onChange={e => setFormData({ ...formData, greenCardShow: e.target.value })} />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('vca_card')}</label>
+                                        <Select className="h-8" value={formData.hasVas} onChange={e => setFormData({ ...formData, hasVas: e.target.value })} options={[{ value: 'yes', label: t('yes') }, { value: 'no', label: t('no') }]} />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('hotworks_as1')}</label>
+                                        <div className="flex gap-2">
+                                            <Select className="h-8 w-24" value={formData.hasHotworks} onChange={e => setFormData({ ...formData, hasHotworks: e.target.value })} options={[{ value: 'yes', label: t('yes') }, { value: 'no', label: t('no') }]} />
+                                            {formData.hasHotworks === 'yes' && (
+                                                <Input className="h-8 flex-1" placeholder="Type / Expiry" value={formData.hotworksType} onChange={e => setFormData({ ...formData, hotworksType: e.target.value })} />
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Statuses Footer */}
-                            <div className="flex flex-wrap items-center gap-6 pt-6 border-t mt-4">
-                                <StatusBadge label={t('admin_registered')} active={true} />
-                                <StatusBadge label={t('admin_confirmed')} active={worker.status === 'active'} />
+                            {/* Clothing Sizes - NEW SECTION */}
+                            <div className="space-y-6">
+                                <h3 className="text-xs font-black text-scafoteam-navy border-b border-scafoteam-navy pb-1 block">
+                                    Apģērba izmēri
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-12 gap-y-6">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Zābaki</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.bootSize} onChange={e => setFormData({ ...formData, bootSize: e.target.value })} placeholder="42" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Jaka</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.jacketSize} onChange={e => setFormData({ ...formData, jacketSize: e.target.value })} placeholder="L" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bikses</label>
+                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.trouserSize} onChange={e => setFormData({ ...formData, trouserSize: e.target.value })} placeholder="52" />
+                                    </div>
+                                </div>
                             </div>
 
+                            {/* Statuses Footer & Save Button */}
+                            <div className="flex flex-col gap-6 pt-6 border-t mt-4">
+                                <div className="flex items-center gap-6">
+                                    <StatusBadge label={t('admin_registered')} active={true} />
+                                    <StatusBadge label={t('admin_confirmed')} active={worker.status === 'active'} />
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <Button
+                                        className={cn(
+                                            "px-8 h-12 font-bold rounded-xl shadow-lg transition-all text-sm",
+                                            isSaved
+                                                ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
+                                                : "bg-scafoteam-navy hover:bg-scafoteam-navy/90 shadow-scafoteam-navy/20"
+                                        )}
+                                        onClick={handleSave}
+                                    >
+                                        {isSaved ? (
+                                            <>
+                                                <Check className="mr-2 w-4 h-4" />
+                                                {t('admin_saved')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="mr-2 w-4 h-4" />
+                                                {t('admin_save_mgmt')}
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -375,8 +565,8 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     <h3 className="text-sm font-black text-scafoteam-navy uppercase tracking-widest">{t('admin_project')} & {t('admin_hourly_rate')}</h3>
                                     <div className="grid gap-4">
                                         <Select
-                                            value={adminFormData.project}
-                                            onChange={e => setAdminFormData(prev => ({ ...prev, project: e.target.value }))}
+                                            value={formData.project}
+                                            onChange={e => setFormData(prev => ({ ...prev, project: e.target.value }))}
                                             options={[
                                                 { value: '', label: t('admin_select_project') },
                                                 ...(projects || []).map(p => ({ value: p?.name || '', label: p?.name || '---' }))
@@ -390,12 +580,12 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">€</span>
                                                     <Input
                                                         className="pl-8 h-11 shadow-sm font-bold"
-                                                        value={adminFormData.hourlyRate}
-                                                        onChange={e => setAdminFormData(prev => ({ ...prev, hourlyRate: e.target.value }))}
+                                                        value={formData.hourlyRate}
+                                                        onChange={e => setFormData(prev => ({ ...prev, hourlyRate: e.target.value }))}
                                                         placeholder="0.00"
                                                     />
-                                                    {worker.adminData?.hasPerDiem && (
-                                                        <div className="absolute -top-3 -right-2 px-2 py-0.5 bg-scafoteam-gold text-scafoteam-navy text-[8px] font-black uppercase rounded-md shadow-sm border border-scafoteam-gold/20">
+                                                    {formData.hasPerDiem && (
+                                                        <div className="absolute -top-3 -right-2 px-2 py-0.5 bg-scafoteam-navy text-white text-[8px] font-black uppercase rounded-md shadow-sm border border-white/10">
                                                             + P.D
                                                         </div>
                                                     )}
@@ -404,17 +594,17 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                             <div className="pt-6">
                                                 <div
                                                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-scafoteam-navy/5 transition-colors group"
-                                                    onClick={() => setAdminFormData(prev => ({ ...prev, hasPerDiem: !prev.hasPerDiem }))}
+                                                    onClick={() => setFormData(prev => ({ ...prev, hasPerDiem: !prev.hasPerDiem }))}
                                                 >
                                                     <div
                                                         className={cn(
                                                             "w-6 h-6 rounded-md flex items-center justify-center border-2 transition-all",
-                                                            adminFormData.hasPerDiem ? "bg-scafoteam-navy border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20" : "border-gray-200 bg-white"
+                                                            formData.hasPerDiem ? "bg-scafoteam-navy border-scafoteam-navy shadow-lg shadow-scafoteam-navy/20" : "border-gray-200 bg-white"
                                                         )}
                                                     >
-                                                        {adminFormData.hasPerDiem && <Check className="w-4 h-4 text-white stroke-[4px]" />}
+                                                        {formData.hasPerDiem && <Check className="w-4 h-4 text-white stroke-[4px]" />}
                                                     </div>
-                                                    <span className={cn("text-xs font-black uppercase tracking-widest select-none", adminFormData.hasPerDiem ? "text-scafoteam-navy" : "text-gray-400")}>
+                                                    <span className={cn("text-xs font-black uppercase tracking-widest select-none", formData.hasPerDiem ? "text-scafoteam-navy" : "text-gray-400")}>
                                                         {t('admin_per_diem')}
                                                     </span>
                                                 </div>
@@ -428,11 +618,11 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_contract_start')}</label>
-                                            <Input type="date" className="h-12" value={adminFormData.contractStart} onChange={e => setAdminFormData(prev => ({ ...prev, contractStart: e.target.value }))} />
+                                            <Input type="date" className="h-12" value={formData.contractStart} onChange={e => setFormData(prev => ({ ...prev, contractStart: e.target.value }))} />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_contract_end')}</label>
-                                            <Input type="date" className="h-12" value={adminFormData.contractEnd} onChange={e => setAdminFormData(prev => ({ ...prev, contractEnd: e.target.value }))} />
+                                            <Input type="date" className="h-12" value={formData.contractEnd} onChange={e => setFormData(prev => ({ ...prev, contractEnd: e.target.value }))} />
                                         </div>
                                     </div>
                                 </div>
@@ -444,16 +634,16 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     <div className="grid gap-4">
                                         <Input
                                             className="h-12"
-                                            value={adminFormData.rentAddress}
-                                            onChange={e => setAdminFormData(prev => ({ ...prev, rentAddress: e.target.value }))}
+                                            value={formData.rentAddress}
+                                            onChange={e => setFormData(prev => ({ ...prev, rentAddress: e.target.value }))}
                                             placeholder={t('admin_rent_address')}
                                         />
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">€</span>
                                             <Input
                                                 className="h-12 pl-8 font-bold text-emerald-600"
-                                                value={adminFormData.rentPrice}
-                                                onChange={e => setAdminFormData(prev => ({ ...prev, rentPrice: e.target.value }))}
+                                                value={formData.rentPrice}
+                                                onChange={e => setFormData(prev => ({ ...prev, rentPrice: e.target.value }))}
                                                 placeholder={t('admin_rent_price')}
                                             />
                                         </div>
@@ -470,8 +660,8 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_portal_identifier')}</label>
                                             <Input
                                                 className="h-11 bg-white border-emerald-100 font-bold"
-                                                value={adminFormData.portalLogin}
-                                                onChange={e => setAdminFormData(prev => ({ ...prev, portalLogin: e.target.value }))}
+                                                value={formData.portalLogin}
+                                                onChange={e => setFormData(prev => ({ ...prev, portalLogin: e.target.value }))}
                                                 placeholder={worker.email}
                                             />
                                         </div>
@@ -503,7 +693,7 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                         ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
                                         : "bg-scafoteam-navy hover:bg-scafoteam-navy/90 shadow-scafoteam-navy/20"
                                 )}
-                                onClick={handleSaveAdminData}
+                                onClick={handleSave}
                             >
                                 {isSaved ? (
                                     <>
@@ -758,6 +948,40 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                 <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">{t('admin_no_documents')}</p>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'history' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <h3 className="text-sm font-black text-scafoteam-navy uppercase tracking-widest mb-4">Projekta Vēsture</h3>
+
+                        <div className="space-y-4">
+                            {projectHistory.length === 0 ? (
+                                <div className="text-center py-8 text-gray-400 text-sm">
+                                    Nav atrasta projekta vēsture.
+                                </div>
+                            ) : (
+                                projectHistory.map((entry) => (
+                                    <div key={entry.id} className="p-4 bg-white border border-gray-100 rounded-xl flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold text-scafoteam-navy">{entry.projects?.name || 'Nezināms projekts'}</p>
+                                            <p className="text-xs text-gray-500">{entry.role || 'Nav norādīta loma'}</p>
+                                        </div>
+                                        <div className="text-right text-xs">
+                                            <div className="font-bold text-gray-600">
+                                                {new Date(entry.start_date).toLocaleDateString()} - {entry.end_date ? new Date(entry.end_date).toLocaleDateString() : 'Aktīvs'}
+                                            </div>
+                                            <span className={cn(
+                                                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                                                entry.status === 'active' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                                            )}>
+                                                {entry.status === 'active' ? 'Aktīvs' : 'Pabeigts'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

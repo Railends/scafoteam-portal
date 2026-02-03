@@ -28,21 +28,21 @@ export function ConfirmDialog({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="">
-            <div className="p-6 text-center">
-                <div className={cn("w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6", colors[variant])}>
-                    <Icon className="w-8 h-8" />
+        <Modal isOpen={isOpen} onClose={onClose} title="" className="sm:max-w-md">
+            <div className="p-4 text-center">
+                <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3", colors[variant])}>
+                    <Icon className="w-6 h-6" />
                 </div>
-                {title && <h3 className="text-xl font-black text-scafoteam-navy mb-2">{title}</h3>}
-                <p className="text-gray-500 mb-8 font-medium">{message}</p>
-                <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 uppercase tracking-wider text-[10px]">
+                {title && <h3 className="text-base font-black text-scafoteam-navy mb-2 uppercase tracking-tight">{title}</h3>}
+                <p className="text-gray-600 mb-4 text-sm font-medium leading-relaxed">{message}</p>
+                <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={onClose} className="rounded-lg font-bold h-10 text-xs">
                         {cancelText}
                     </Button>
                     <Button
                         onClick={() => { onConfirm(); onClose(); }}
                         className={cn(
-                            "rounded-xl font-bold h-12 uppercase tracking-wider text-[10px]",
+                            "rounded-lg font-bold h-10 text-xs",
                             variant === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-scafoteam-navy hover:bg-blue-900'
                         )}
                     >

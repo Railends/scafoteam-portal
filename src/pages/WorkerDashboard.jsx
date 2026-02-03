@@ -208,11 +208,11 @@ export default function WorkerDashboard() {
         <Layout className="max-w-6xl pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 mt-4">
                 <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 rounded-3xl bg-scafoteam-gold/20 flex items-center justify-center border-2 border-scafoteam-gold/20 shadow-xl shadow-scafoteam-gold/5 overflow-hidden">
-                        {worker.adminData?.profileImage ? (
-                            <img src={worker.adminData.profileImage} alt="" className="w-full h-full object-cover" />
+                    <div className="w-20 h-20 rounded-3xl bg-scafoteam-navy/20 flex items-center justify-center border-2 border-white/10 shadow-xl shadow-scafoteam-navy/5 overflow-hidden">
+                        {worker.profileImage ? (
+                            <img src={worker.profileImage} alt="" className="w-full h-full object-cover" />
                         ) : (
-                            <User className="w-10 h-10 text-scafoteam-gold" />
+                            <User className="w-10 h-10 text-scafoteam-accent" />
                         )}
                     </div>
                     <div>
@@ -262,7 +262,8 @@ export default function WorkerDashboard() {
                     <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-xl shadow-scafoteam-navy/5">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
                             <h3 className="text-xs font-black text-scafoteam-navy uppercase tracking-widest flex items-center gap-3">
-                                <PenTool className="w-4 h-4 text-scafoteam-gold" />
+                                <PenTool className="w-4 h-4 text-scafoteam-accent" />
+
                                 {t('admin_contracts')}
                             </h3>
                             {selectedContracts.length > 0 && (
@@ -356,7 +357,8 @@ export default function WorkerDashboard() {
                                 <Button
                                     size="sm"
                                     onClick={() => document.getElementById('worker-doc-upload').click()}
-                                    className="bg-scafoteam-gold hover:bg-scafoteam-gold/90 text-scafoteam-navy font-black h-8 px-4 text-[10px] rounded-lg shadow-lg shadow-scafoteam-gold/20"
+                                    className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white font-black h-8 px-4 text-[10px] rounded-lg shadow-lg shadow-scafoteam-navy/20"
+
                                     disabled={isUploading}
                                 >
                                     {isUploading ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : <Upload className="w-3 h-3 mr-2" />}
@@ -406,7 +408,8 @@ export default function WorkerDashboard() {
                         <CardContent className="px-8 pb-8 space-y-6">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-white/10 rounded-2xl">
-                                    <Briefcase className="w-6 h-6 text-scafoteam-gold" />
+                                    <Briefcase className="w-6 h-6 text-scafoteam-accent" />
+
                                 </div>
                                 <div>
                                     <p className="text-xl font-black">{worker.adminData?.project || '---'}</p>
@@ -417,7 +420,8 @@ export default function WorkerDashboard() {
                                 <div className="flex justify-between items-start mb-2">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-blue-200/40">{t('hourly_rate')}</p>
                                     {worker.adminData?.hasPerDiem && (
-                                        <span className="px-2 py-0.5 bg-scafoteam-gold text-scafoteam-navy text-[8px] font-black uppercase rounded-md shadow-lg shadow-scafoteam-gold/20 whitespace-nowrap">+ P.D</span>
+                                        <span className="px-2 py-0.5 bg-scafoteam-navy text-white text-[8px] font-black uppercase rounded-md shadow-lg shadow-scafoteam-navy/20 whitespace-nowrap">+ P.D</span>
+
                                     )}
                                 </div>
                                 <p className="text-4xl font-black text-white">€ {worker.adminData?.hourlyRate || '0.00'}</p>

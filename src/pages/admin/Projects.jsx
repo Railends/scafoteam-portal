@@ -113,7 +113,8 @@ export default function Projects() {
                             <Card key={project.id} className="hover:shadow-xl transition-all duration-300 border-gray-100 group">
                                 <CardContent className="p-6">
                                     <div className="flex items-start justify-between mb-4">
-                                        <div className="p-3 bg-scafoteam-gold/10 text-scafoteam-gold rounded-xl group-hover:scale-110 transition-transform">
+                                        <div className="p-3 bg-scafoteam-accent/10 text-scafoteam-accent rounded-xl group-hover:scale-110 transition-transform">
+
                                             <Briefcase className="w-6 h-6" />
                                         </div>
                                         <Button

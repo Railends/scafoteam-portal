@@ -162,7 +162,8 @@ export default function ClientAccounts() {
                                 <div className="space-y-2 pb-4 max-h-32 overflow-y-auto">
                                     {clientProjects.map(project => (
                                         <div key={project.id} className="flex items-center gap-2 text-xs text-scafoteam-navy font-semibold bg-white p-2 rounded-lg border border-scafoteam-navy/5 shadow-sm">
-                                            <Briefcase className="w-3 h-3 text-scafoteam-gold" />
+                                            <Briefcase className="w-3 h-3 text-scafoteam-accent" />
+
                                             {project.name}
                                         </div>
                                     ))}
@@ -244,7 +245,8 @@ export default function ClientAccounts() {
                                         )}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <Briefcase className={cn("w-4 h-4", project.clientId === editingClient.id ? "text-scafoteam-gold" : "text-gray-300")} />
+                                            <Briefcase className={cn("w-4 h-4", project.clientId === editingClient.id ? "text-scafoteam-accent" : "text-gray-300")} />
+
                                             <span className="truncate">{project.name}</span>
                                         </div>
                                         {project.clientId === editingClient.id && (

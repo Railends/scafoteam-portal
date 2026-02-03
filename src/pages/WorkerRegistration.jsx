@@ -98,7 +98,8 @@ export default function WorkerRegistration() {
                     <h1 className="text-3xl font-bold text-scafoteam-navy tracking-tight">{t('welcome')}</h1>
                     <div className="flex justify-center gap-2">
                         {STEPS.map((step, idx) => (
-                            <div key={step.id} className={`h-2 rounded-full transition-all duration-300 ${idx <= currentStep ? 'w-8 bg-scafoteam-gold shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'w-2 bg-gray-200'}`} />
+                            <div key={step.id} className={`h-2 rounded-full transition-all duration-300 ${idx <= currentStep ? 'w-8 bg-scafoteam-accent shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'w-2 bg-gray-200'}`} />
+
                         ))}
                     </div>
                 </div>
@@ -169,8 +170,9 @@ export default function WorkerRegistration() {
                                             <div className="pt-4 border-t">
                                                 <label className="text-sm font-medium mb-3 block">{t('has_finnish_id')}</label>
                                                 <div className="flex gap-4 mb-4">
-                                                    <label className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition-all duration-200 ${hasFinnishId === 'yes' ? 'border-scafoteam-gold bg-yellow-50/50 ring-1 ring-scafoteam-gold' : 'hover:bg-gray-50'}`}>
-                                                        <input type="radio" value="yes" className="accent-scafoteam-gold" {...register('hasFinnishId')} /> {t('yes')}
+                                                    <label className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition-all duration-200 ${hasFinnishId === 'yes' ? 'border-scafoteam-accent bg-blue-50/50 ring-1 ring-scafoteam-accent' : 'hover:bg-gray-50'}`}>
+                                                        <input type="radio" value="yes" className="accent-scafoteam-accent" {...register('hasFinnishId')} /> {t('yes')}
+
                                                     </label>
                                                     <label className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition-all duration-200 ${hasFinnishId === 'no' ? 'border-gray-300 bg-gray-50' : 'hover:bg-gray-50'}`}>
                                                         <input type="radio" value="no" className="accent-scafoteam-navy" {...register('hasFinnishId')} /> {t('no')}

@@ -117,6 +117,8 @@ const resources = {
             "admin_view": "View",
             "admin_approve": "Approve",
             "admin_approve_confirm": "Approve this worker and move to Active list?",
+            "active_workers": "ACTIVE WORKERS",
+            "active_workers_count": "{{count}} active workers",
             "admin_active_workers": "Active Workers",
             "admin_search_active": "Search active...",
             "admin_project": "Project",
@@ -127,6 +129,7 @@ const resources = {
             "admin_rent_info": "Rent Info",
             "admin_contract_period": "Contract Period",
             "admin_actions": "Actions",
+            "add_worker": "Add Worker",
             "admin_select_project": "Select Project",
             "admin_rent_address": "Address",
             "admin_rent_price": "Rent €",
@@ -272,7 +275,8 @@ const resources = {
             "change_password": "Change Password",
             "new_password": "New Password",
             "confirm_password": "Confirm Password",
-            "password_rules": "Leave blank to keep current password"
+            "password_rules": "Leave blank to keep current password",
+            "missing_info": "Missing Information"
 
 
         }
@@ -392,7 +396,8 @@ const resources = {
             "admin_view": "Skatīt",
             "admin_approve": "Apstiprināt",
             "admin_approve_confirm": "Apstiprināt šo darbinieku un pārcelt uz aktīvo sarakstu?",
-            "admin_active_workers": "Aktīvie darbinieki",
+            "active_workers": "AKTĪVIE DARBINIEKI",
+            "active_workers_count": "{{count}} aktīvie darbinieki",
             "admin_search_active": "Meklēt aktīvajos...",
             "admin_project": "Projekts",
             "admin_name_surname": "Vārds Uzvārds",
@@ -402,6 +407,7 @@ const resources = {
             "admin_rent_info": "Īres info",
             "admin_contract_period": "Līguma termiņš",
             "admin_actions": "Darbības",
+            "add_worker": "Pievienot darbinieku",
             "admin_select_project": "Izvēlēties projektu",
             "admin_rent_address": "Adrese",
             "admin_rent_price": "Īre €",
@@ -540,7 +546,8 @@ const resources = {
             "change_password": "Mainīt paroli",
             "new_password": "Jaunā parole",
             "confirm_password": "Apstiprināt jauno paroli",
-            "password_rules": "Atstājiet tukšu, ja nevēlaties mainīt"
+            "password_rules": "Atstājiet tukšu, ja nevēlaties mainīt",
+            "missing_info": "Trūkst informācijas"
 
         }
     },
@@ -657,6 +664,8 @@ const resources = {
             "admin_view": "Просмотр",
             "admin_approve": "Одобрить",
             "admin_approve_confirm": "Одобрить этого работника и переместить в список активных?",
+            "active_workers": "АКТИВНЫЕ РАБОТНИКИ",
+            "active_workers_count": "{{count}} активных работников",
             "admin_active_workers": "Активные работники",
             "admin_search_active": "Поиск активных...",
             "admin_project": "Проект",
@@ -667,6 +676,7 @@ const resources = {
             "admin_rent_info": "Инфо об аренде",
             "admin_contract_period": "Срок контракта",
             "admin_actions": "Действия",
+            "add_worker": "Добавить работника",
             "admin_select_project": "Выбрать проект",
             "admin_rent_address": "Адрес",
             "admin_rent_price": "Аренда €",
@@ -795,7 +805,8 @@ const resources = {
             "admin_signed_successfully": "Контракт успешно подписан",
             "admin_please_sign": "Пожалуйста, поставьте подпись перед сохранением",
             "admin_signature_pad": "Панель подписи",
-            "admin_clear_signature": "Очистить"
+            "admin_clear_signature": "Очистить",
+            "missing_info": "Отсутствует информация"
         }
     }
 };

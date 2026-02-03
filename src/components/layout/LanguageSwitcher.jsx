@@ -84,7 +84,8 @@ export function LanguageSwitcher({ className, showRU = true }) {
                                 </div>
                                 {i18n.language === lng.code && (
                                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                        <Check className="w-3 h-3 text-scafoteam-gold" />
+                                        <Check className="w-3 h-3 text-scafoteam-accent" />
+
                                     </motion.div>
                                 )}
                             </button>

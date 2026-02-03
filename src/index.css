@@ -18,6 +18,19 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
 }
 
 @theme {
@@ -50,11 +63,12 @@
 
   /* Scafoteam colors */
   --color-scafoteam-navy: #1a2a44;
-  --color-scafoteam-gold: #f59e0b;
-  /* More vibrant gold */
-  --color-scafoteam-gold-light: #fbbf24;
+  --color-scafoteam-navy-light: #2a3b5a;
+  --color-scafoteam-accent: #3b82f6;
+  /* Steel Blue accent */
   --color-scafoteam-light: #f3f4f6;
   --color-scafoteam-dark: #0f172a;
+
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -74,20 +88,17 @@
     }
   }
 
-  @keyframes gradient {
+  @keyframes ticker {
     0% {
-      background-position: 0% 50%;
-    }
-
-    50% {
-      background-position: 100% 50%;
+      transform: translateX(100%);
     }
 
     100% {
-      background-position: 0% 50%;
+      transform: translateX(-100%);
     }
   }
 }
+
 
 @layer utilities {
   .animate-slow-zoom {
@@ -99,9 +110,10 @@
   }
 
 
-  .text-glow-gold {
-    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+  .text-glow-blue {
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
   }
+
 
   .bg-glass {
     @apply bg-white/5 backdrop-blur-xl border border-white/10;
@@ -112,7 +124,8 @@
   :root {
     --background: 210 25% 97.5%;
     --foreground: 222 47% 12%;
-    --gold: 38 92% 50%;
+    --accent-blue: 217 91% 60%;
+
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -165,10 +178,11 @@
     background-image:
       radial-gradient(at 0% 0%, hsla(210, 30%, 96%, 1) 0, transparent 50%),
       radial-gradient(at 50% 0%, hsla(210, 25%, 98%, 1) 0, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(38, 50%, 94%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(217, 30%, 94%, 1) 0, transparent 50%),
       radial-gradient(at 50% 100%, hsla(210, 20%, 99%, 1) 0, transparent 50%);
     background-color: hsl(var(--background));
   }
+
 
   .dark body {
     background-image: radial-gradient(circle at center top, #1e293b 0%, #0f172a 100%);

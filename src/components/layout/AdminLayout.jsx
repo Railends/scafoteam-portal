@@ -8,7 +8,7 @@ import { BrandLogo } from '../common/BrandLogo';
 
 
 
-import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings } from 'lucide-react';
+import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings, Home } from 'lucide-react';
 
 export function AdminLayout({ children }) {
     const { t } = useTranslation();
@@ -17,6 +17,7 @@ export function AdminLayout({ children }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const adminUser = JSON.parse(localStorage.getItem('scafoteam_admin_user') || '{}');
     const isSuperAdmin = adminUser.role === 'superadmin';
+    const [adminMode, setAdminMode] = useState('HR'); // 'HR' or 'EMPLOYER'
 
     const handleLogout = () => {
         localStorage.removeItem('scafoteam_admin_auth');
@@ -24,19 +25,24 @@ export function AdminLayout({ children }) {
     };
 
     const navItems = [
-        { label: t('admin_pending_registrations'), path: '/admin/dashboard/pending', icon: Users },
-        { label: t('admin_active_workers'), path: '/admin/dashboard/active', icon: UserCheck },
-        { label: t('admin_projects'), path: '/admin/dashboard/projects', icon: LayoutDashboard },
-        { label: t('admin_client_accounts'), path: '/admin/dashboard/clients', icon: Building2 },
-        { label: t('admin_contacts'), path: '/admin/dashboard/contacts', icon: Contact },
-        { label: t('admin_catalogs'), path: '/admin/dashboard/catalogs', icon: Package },
-        { label: t('admin_training'), path: '/admin/dashboard/training', icon: GraduationCap },
-        { label: t('admin_document_templates'), path: '/admin/dashboard/templates', icon: FileText },
+        // HR Mode Items
+        { label: t('admin_pending_registrations'), path: '/admin/dashboard/pending', icon: Users, mode: 'HR' },
+        { label: t('admin_active_workers'), path: '/admin/dashboard/active', icon: UserCheck, mode: 'HR' },
+        { label: t('admin_projects'), path: '/admin/dashboard/projects', icon: LayoutDashboard, mode: 'HR' }, // Keep in HR for now as requested "current sections"
+        { label: t('admin_client_accounts'), path: '/admin/dashboard/clients', icon: Building2, mode: 'HR' },
+        { label: t('admin_contacts'), path: '/admin/dashboard/contacts', icon: Contact, mode: 'HR' },
+        { label: t('admin_catalogs'), path: '/admin/dashboard/catalogs', icon: Package, mode: 'HR' },
+        { label: t('admin_training'), path: '/admin/dashboard/training', icon: GraduationCap, mode: 'HR' },
+        { label: 'Dzīvesvietas', path: '/admin/dashboard/residences', icon: Home, mode: 'HR' },
+        { label: t('admin_document_templates'), path: '/admin/dashboard/templates', icon: FileText, mode: 'HR' },
+
+        // EMPLOYER Mode Items (Placeholder for now)
+        // { label: 'Stats', path: '/admin/dashboard/stats', icon: PieChart, mode: 'EMPLOYER' },
     ];
 
     const NavLinks = ({ onClick }) => (
         <>
-            {navItems.map((item) => {
+            {navItems.filter(item => item.mode === adminMode).map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 return (
@@ -69,6 +75,26 @@ export function AdminLayout({ children }) {
                     </div>
 
 
+                    <div className="flex p-1 bg-scafoteam-navy-light/30 rounded-lg mt-4 border border-white/5">
+                        <button
+                            onClick={() => setAdminMode('HR')}
+                            className={cn(
+                                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all",
+                                adminMode === 'HR' ? "bg-white text-scafoteam-navy shadow-sm" : "text-gray-400 hover:text-white"
+                            )}
+                        >
+                            HR
+                        </button>
+                        <button
+                            onClick={() => setAdminMode('EMPLOYER')}
+                            className={cn(
+                                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all",
+                                adminMode === 'EMPLOYER' ? "bg-white text-scafoteam-navy shadow-sm" : "text-gray-400 hover:text-white"
+                            )}
+                        >
+                            EMPLOYER
+                        </button>
+                    </div>
                 </div>
                 <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
                     <div className="px-3 mb-2">
@@ -109,7 +135,8 @@ export function AdminLayout({ children }) {
                         >
                             <div className="p-6 border-b border-white/10 flex items-center justify-between">
                                 <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-                                    <div className="w-8 h-8 bg-scafoteam-gold rounded-lg flex items-center justify-center">
+                                    <div className="w-8 h-8 bg-scafoteam-accent rounded-lg flex items-center justify-center">
+
                                         <Shield className="w-5 h-5 text-scafoteam-navy" />
                                     </div>
                                     <span>SCAFOTEAM</span>
@@ -148,7 +175,8 @@ export function AdminLayout({ children }) {
                         </button>
 
                         <div className="hidden md:flex items-center gap-3">
-                            <div className="w-1.5 h-6 bg-scafoteam-gold rounded-full" />
+                            <div className="w-1.5 h-6 bg-scafoteam-accent rounded-full" />
+
                             <h2 className="text-sm font-black text-scafoteam-navy uppercase tracking-widest">
                                 {navItems.find(item => item.path === location.pathname)?.label || t('admin_panel')}
                             </h2>

@@ -43,7 +43,8 @@ export default function Landing() {
                         transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                         className={cn(
                             "absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px]",
-                            isDark ? "bg-scafoteam-gold opacity-20" : "bg-scafoteam-gold/20 opacity-40"
+                            isDark ? "bg-scafoteam-accent opacity-20" : "bg-scafoteam-navy/20 opacity-40"
+
                         )}
                     />
 
@@ -87,7 +88,8 @@ export default function Landing() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                     >
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-scafoteam-gold/10 border border-scafoteam-gold/20 text-scafoteam-gold text-xs font-bold uppercase tracking-[0.2em] mb-8">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-scafoteam-accent/10 border border-scafoteam-accent/20 text-scafoteam-accent text-xs font-bold uppercase tracking-[0.2em] mb-8">
+
                             <Award className="w-3 h-3" />
                             Premium Scaffolding & Insulation
                         </div>
@@ -121,7 +123,8 @@ export default function Landing() {
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center w-full max-w-sm sm:max-w-none mx-auto">
                             <Link to="/register" className="w-full sm:w-auto">
-                                <Button size="xl" className="bg-scafoteam-gold hover:bg-yellow-400 text-scafoteam-navy font-black w-full sm:w-auto px-10 rounded-2xl shadow-[0_0_30px_rgba(251,191,36,0.2)] transition-all hover:scale-105 active:scale-95">
+                                <Button size="xl" className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white font-black w-full sm:w-auto px-10 rounded-2xl shadow-[0_0_30px_rgba(59,130,246,0.2)] transition-all hover:scale-105 active:scale-95">
+
                                     {t('register_now')} <ArrowRight className="ml-2 h-6 w-6" />
                                 </Button>
                             </Link>
@@ -159,7 +162,8 @@ export default function Landing() {
                                 icon: HardHat,
                                 title: t('expert_team'),
                                 desc: t('expert_desc'),
-                                color: 'from-scafoteam-gold/20 to-orange-500/20'
+                                color: 'from-scafoteam-navy/20 to-scafoteam-accent/20'
+
                             },
                             {
                                 icon: CheckCircle,
@@ -171,13 +175,15 @@ export default function Landing() {
                             <motion.div
                                 key={idx}
                                 variants={fadeInUp}
-                                className="group relative p-10 rounded-[2.5rem] bg-white/60 dark:bg-white/5 border border-white/80 dark:border-white/10 hover:border-scafoteam-gold/30 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-scafoteam-navy/[0.02] backdrop-blur-sm"
+                                className="group relative p-10 rounded-[2.5rem] bg-white/60 dark:bg-white/5 border border-white/80 dark:border-white/10 hover:border-scafoteam-accent/30 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-scafoteam-navy/[0.02] backdrop-blur-sm"
+
 
                             >
 
                                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] blur-2xl -z-10`} />
-                                <div className="w-16 h-16 bg-scafoteam-navy dark:bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-gray-100 dark:border-white/10 group-hover:border-scafoteam-gold/50 transition-colors">
-                                    <feature.icon className="h-8 w-8 text-scafoteam-gold transition-transform group-hover:scale-110" />
+                                <div className="w-16 h-16 bg-scafoteam-navy dark:bg-white/5 rounded-2xl flex items-center justify-center mb-8 border border-gray-100 dark:border-white/10 group-hover:border-scafoteam-accent/50 transition-colors">
+                                    <feature.icon className="h-8 w-8 text-scafoteam-accent transition-transform group-hover:scale-110" />
+
                                 </div>
                                 <h3 className="text-2xl font-black text-scafoteam-navy dark:text-white mb-4 tracking-tight uppercase">{feature.title}</h3>
                                 <p className="text-slate-800 dark:text-gray-300 text-lg leading-relaxed font-semibold">
@@ -195,7 +201,8 @@ export default function Landing() {
             {/* Stats/Trust Section */}
             <section className="py-24 border-y border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/[0.02] relative overflow-hidden">
 
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-scafoteam-gold/5 to-transparent animate-pulse" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-scafoteam-accent/5 to-transparent animate-pulse" />
+
                 <div className="max-w-[1400px] mx-auto px-6 relative z-10">
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 text-center">
@@ -213,7 +220,8 @@ export default function Landing() {
                                 viewport={{ once: true }}
                             >
                                 <p className="text-4xl md:text-6xl font-black text-scafoteam-navy dark:text-white mb-3 tracking-tighter">{stat.value}</p>
-                                <p className="text-scafoteam-gold text-xs font-bold uppercase tracking-[0.3em]">{stat.label}</p>
+                                <p className="text-scafoteam-accent text-xs font-bold uppercase tracking-[0.3em]">{stat.label}</p>
+
                             </motion.div>
 
                         ))}
@@ -224,7 +232,8 @@ export default function Landing() {
             {/* CTA Section */}
             <section className="py-40 relative overflow-hidden bg-white dark:bg-[#0f172a]">
 
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-scafoteam-gold/5 rounded-full blur-[120px] -z-10" />
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-scafoteam-navy/5 rounded-full blur-[120px] -z-10" />
+
                 <div className="max-w-[1400px] mx-auto px-6 text-center">
 
                     <motion.div

@@ -4,8 +4,10 @@ import { workerStore, projectStore } from '@/lib/store';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Search, Eye, Trash2, UserCheck, AlertCircle, Clock, Filter, X, CheckSquare, Square, ChevronDown, UserPlus, Info, AlertTriangle } from 'lucide-react';
+import { AddWorkerModal } from '@/components/admin/AddWorkerModal';
 import { WorkerDetailModal } from '@/components/admin/WorkerDetailModal';
-import { Search, Eye, Trash2, UserCheck, AlertCircle, Clock, Filter, X, CheckSquare, Square, ChevronDown } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
 
 // Helper component for multi-select dropdown with checkboxes
@@ -68,6 +70,7 @@ export default function ActiveWorkers() {
     const [selectedProjectIds, setSelectedProjectIds] = useState([]);
     const [selectedWorkerIds, setSelectedWorkerIds] = useState([]);
     const [statusFilter, setStatusFilter] = useState('');
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -78,6 +81,21 @@ export default function ActiveWorkers() {
         setWorkers(allWorkers.filter(w => w.status === 'active'));
         const allProjects = (await projectStore.getAll()) || [];
         setProjects(allProjects);
+    };
+
+    const getMissingFields = (worker) => {
+        const missing = [];
+        if (!worker.phone) missing.push(t('phone'));
+        if (!worker.email || worker.email.includes('@placeholder.local')) missing.push(t('email'));
+        if (!worker.nationality) missing.push(t('nationality'));
+        if (!worker.personalId && !worker.adminData?.personalId) missing.push(t('personal_id'));
+        if (!worker.adminData?.address && !worker.address) missing.push(t('address'));
+        if (!worker.adminData?.bankAccount && !worker.bankAccount) missing.push(t('bank_account'));
+
+        if (!worker.adminData?.project) missing.push(t('admin_project'));
+        if (!worker.adminData?.hourlyRate) missing.push(t('admin_hourly_rate'));
+
+        return missing;
     };
 
     const getDaysRemaining = (endDate) => {
@@ -150,35 +168,44 @@ export default function ActiveWorkers() {
     return (
         <AdminLayout>
             <div className="space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-scafoteam-navy">{t('admin_active_workers')}</h1>
-                        <p className="text-gray-500 mt-1">{t('admin_active_desc')}</p>
+                        <h1 className="text-3xl font-black text-scafoteam-navy tracking-tight uppercase">{t('active_workers')}</h1>
+                        <p className="text-slate-500 font-medium text-sm mt-1">{workers.length} {t('active_workers_count')}</p>
                     </div>
-                    <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                        <div className="relative flex-1 md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <Input
-                                placeholder={t('admin_filter_all')}
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="pl-10 bg-white"
-                            />
-                        </div>
+                    <div className="flex items-center gap-3">
                         <Button
-                            variant="outline"
-                            className="bg-white"
-                            onClick={() => {
-                                setSearch('');
-                                setSelectedProjectIds([]);
-                                setSelectedWorkerIds([]);
-                                setStatusFilter('');
-                            }}
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white font-black px-6 h-12 rounded-xl shadow-lg shadow-scafoteam-navy/20 flex items-center gap-2"
                         >
-                            <X className="w-4 h-4 mr-2" />
-                            {t('clear')}
+                            <UserPlus className="w-5 h-5" />
+                            {t('add_worker')}
                         </Button>
                     </div>
+                </div>
+                <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                            placeholder={t('admin_filter_all')}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-10 bg-white"
+                        />
+                    </div>
+                    <Button
+                        variant="outline"
+                        className="bg-white"
+                        onClick={() => {
+                            setSearch('');
+                            setSelectedProjectIds([]);
+                            setSelectedWorkerIds([]);
+                            setStatusFilter('');
+                        }}
+                    >
+                        <X className="w-4 h-4 mr-2" />
+                        {t('clear')}
+                    </Button>
                 </div>
 
                 {/* Updated Advanced Filters with Checkboxes */}
@@ -216,7 +243,7 @@ export default function ActiveWorkers() {
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group/table">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto no-scrollbar">
                         <table className="w-full text-left border-collapse min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-50/50 border-b border-gray-100">
@@ -229,7 +256,7 @@ export default function ActiveWorkers() {
                                     <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32">{t('phone')}</th>
                                     <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32">{t('admin_drivers_licence')}</th>
                                     <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-64">{t('admin_rent_address')}</th>
-                                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-24">{t('admin_rent_price')}</th>
+                                    <th className="p-4 pr-8 text-[10px] font-black text-gray-400 uppercase tracking-widest w-64 min-w-[200px]">{t('admin_rent_price')}</th>
                                     <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center sticky right-0 bg-gray-50/50 z-10 w-32">{t('admin_actions')}</th>
                                 </tr>
                             </thead>
@@ -272,6 +299,24 @@ export default function ActiveWorkers() {
                                                         )}
                                                     </div>
                                                     <span className="font-bold text-scafoteam-navy truncate">{worker.name} {worker.surname}</span>
+                                                    {(() => {
+                                                        const missing = getMissingFields(worker);
+                                                        if (missing.length > 0) {
+                                                            return (
+                                                                <div className="relative group/tooltip">
+                                                                    <AlertTriangle className="w-4 h-4 text-orange-400 cursor-help" />
+                                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 bg-gray-900 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 shadow-xl pointer-events-none">
+                                                                        <div className="font-bold mb-1 uppercase tracking-wider text-orange-300">{t('missing_info')}:</div>
+                                                                        <ul className="list-disc list-inside space-y-0.5 text-gray-300">
+                                                                            {missing.map((m, i) => <li key={i}>{m}</li>)}
+                                                                        </ul>
+                                                                        <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
                                             </td>
                                             <td className="p-4">
@@ -308,7 +353,7 @@ export default function ActiveWorkers() {
                                             <td className="p-4 text-xs truncate max-w-[150px]">
                                                 {worker.adminData?.rentAddress || '---'}
                                             </td>
-                                            <td className="p-4 text-xs font-bold text-emerald-600">
+                                            <td className="p-4 pr-8 text-xs font-bold text-emerald-600 w-64 min-w-[200px]">
                                                 {worker.adminData?.rentPrice ? `€ ${worker.adminData.rentPrice}` : '---'}
                                             </td>
                                             <td className="p-4 sticky right-0 bg-inherit z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.05)]">
@@ -344,16 +389,21 @@ export default function ActiveWorkers() {
                     </div>
                 </div>
 
-                <WorkerDetailModal
-                    worker={selectedWorker}
-                    isOpen={!!selectedWorker}
-                    onClose={() => setSelectedWorker(null)}
-                    onUpdate={async (updated) => {
-                        setWorkers(prev => prev.map(w => w.id === updated.id ? updated : w));
-                        if (selectedWorker?.id === updated.id) setSelectedWorker(updated);
-                    }}
+                {selectedWorker && (
+                    <WorkerDetailModal
+                        worker={selectedWorker}
+                        isOpen={!!selectedWorker}
+                        onClose={() => setSelectedWorker(null)}
+                        onUpdate={loadData}
+                    />
+                )}
 
+                <AddWorkerModal
+                    open={isAddModalOpen}
+                    onOpenChange={setIsAddModalOpen}
+                    onWorkerAdded={loadData}
                 />
+
                 <ConfirmDialog
                     isOpen={confirmDelete.isOpen}
                     onClose={() => setConfirmDelete({ ...confirmDelete, isOpen: false })}
@@ -368,6 +418,3 @@ export default function ActiveWorkers() {
         </AdminLayout>
     );
 }
-
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-

@@ -6,21 +6,40 @@ import { Lock, Sun, Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { BrandLogo } from '../common/BrandLogo';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSettingsStore } from '@/lib/store';
 
 export function Layout({ children, className }) {
     const { t } = useTranslation();
     const { isDark, toggleTheme } = useTheme();
 
+    const { announcement, fetchSettings } = useSettingsStore();
+
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
+    const displayAnnouncement = announcement || t('announcement_text');
+
     return (
 
         <div className={cn("min-h-screen flex flex-col font-sans transition-colors duration-500", isDark ? "bg-[#0f172a] text-white" : "bg-white text-scafoteam-navy")}>
             <div className={cn(
-                "bg-gradient-to-r from-scafoteam-gold via-orange-500 to-scafoteam-gold bg-[length:200%_auto] animate-gradient py-2 px-4 text-center border-b border-black/5",
+                "bg-scafoteam-navy text-white py-2 overflow-hidden border-b border-white/5",
                 !isDark && "brightness-110 shadow-sm"
             )}>
-                <p className="text-[11px] md:text-xs font-black text-scafoteam-navy uppercase tracking-[0.2em]">
-                    🔔 {t('announcement_text')}
-                </p>
+                <div className="relative flex whitespace-nowrap">
+                    <div className="animate-[ticker_30s_linear_infinite] flex gap-12 items-center min-w-full">
+                        <p className="text-[11px] md:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-4">
+                            <span className="text-scafoteam-accent">🔔</span> {displayAnnouncement}
+                        </p>
+                        <p className="text-[11px] md:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-4">
+                            <span className="text-scafoteam-accent">🔔</span> {displayAnnouncement}
+                        </p>
+                        <p className="text-[11px] md:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-4">
+                            <span className="text-scafoteam-accent">🔔</span> {displayAnnouncement}
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <header className={cn(
