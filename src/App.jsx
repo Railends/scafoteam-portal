@@ -16,6 +16,8 @@ import DocumentTemplates from '@/pages/admin/DocumentTemplates';
 import AdminManagement from '@/pages/admin/AdminManagement';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import Residences from '@/pages/admin/Residences';
+import Fleet from '@/pages/admin/Fleet';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
 
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -28,6 +30,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<WorkerRegistration />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/worker/login" element={<WorkerLogin />} />
           <Route path="/worker/dashboard" element={<ProtectedRoute authKey="workerData" redirect="/worker/login"><WorkerDashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminLogin />} />
@@ -42,6 +45,7 @@ function App() {
           <Route path="/admin/dashboard/catalogs" element={<ProtectedRoute><ProductCatalogs /></ProtectedRoute>} />
           <Route path="/admin/dashboard/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
           <Route path="/admin/dashboard/residences" element={<ProtectedRoute><Residences /></ProtectedRoute>} />
+          <Route path="/admin/dashboard/fleet" element={<ProtectedRoute><Fleet /></ProtectedRoute>} />
           <Route path="/admin/dashboard/templates" element={<ProtectedRoute><DocumentTemplates /></ProtectedRoute>} />
           <Route path="/admin/dashboard/admins" element={<ProtectedRoute><AdminManagement /></ProtectedRoute>} />
           <Route path="/admin/dashboard/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />

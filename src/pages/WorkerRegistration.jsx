@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -26,9 +26,9 @@ export default function WorkerRegistration() {
     const [submitted, setSubmitted] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
 
-    const { register, handleSubmit, control, watch, trigger, formState: { errors } } = useForm({
+    const { register, handleSubmit, control, watch, trigger, setValue, formState: { errors } } = useForm({
         mode: 'onChange',
-        defaultValues: {
+        defaultValues: JSON.parse(localStorage.getItem('scafoteam_registration_draft')) || {
             nationality: '',
             hasFinnishId: 'no',
             hasGreenCard: 'no',
@@ -40,6 +40,17 @@ export default function WorkerRegistration() {
             gdpr: false
         }
     });
+
+    // Auto-save feature
+    const formData = watch();
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (formData && Object.keys(formData).length > 0) {
+                localStorage.setItem('scafoteam_registration_draft', JSON.stringify(formData));
+            }
+        }, 1000);
+        return () => clearTimeout(timeout);
+    }, [formData]);
 
     const hasFinnishId = watch('hasFinnishId');
     const hasHotworks = watch('hasHotworks');
@@ -61,8 +72,17 @@ export default function WorkerRegistration() {
     const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 0));
 
     const onSubmit = async (data) => {
+        // Rate limiting guard
+        const lastSubmit = localStorage.getItem('scafoteam_last_submit');
+        if (lastSubmit && Date.now() - parseInt(lastSubmit) < 5000) {
+            alert(t('rate_limit_error', 'Lūdzu, uzgaidiet brīdi pirms nākamā mēģinājuma.'));
+            return;
+        }
+        localStorage.setItem('scafoteam_last_submit', Date.now().toString());
+
         try {
             await workerStore.add(data);
+            localStorage.removeItem('scafoteam_registration_draft'); // Clear auto-save on success
             setSubmitted(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (e) {

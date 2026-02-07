@@ -6,7 +6,9 @@ import { Lock, Sun, Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { BrandLogo } from '../common/BrandLogo';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSettingsStore } from '@/lib/store';
+import { useSettingsStore, adminStore } from '@/lib/store';
+import { CookieConsent } from '../ui/CookieConsent';
+import { supabase } from '@/lib/supabase';
 
 export function Layout({ children, className }) {
     const { t } = useTranslation();
@@ -17,6 +19,35 @@ export function Layout({ children, className }) {
     useEffect(() => {
         fetchSettings();
     }, [fetchSettings]);
+
+    // Admin Session Timeout Logic (30 minutes)
+    useEffect(() => {
+        let timeout;
+        const TIMEOUT_MS = 30 * 60 * 1000;
+
+        const resetTimer = () => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(async () => {
+                const { data } = await supabase.auth.getSession();
+                if (data?.session?.user?.user_metadata?.role === 'admin') {
+                    console.log('Session timed out, logging out admin...');
+                    await supabase.auth.signOut();
+                    localStorage.removeItem('scafoteam_admin_auth');
+                    window.location.href = '/admin';
+                }
+            }, TIMEOUT_MS);
+        };
+
+        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+        events.forEach(event => document.addEventListener(event, resetTimer));
+
+        resetTimer();
+
+        return () => {
+            if (timeout) clearTimeout(timeout);
+            events.forEach(event => document.removeEventListener(event, resetTimer));
+        };
+    }, []);
 
     const displayAnnouncement = announcement || t('announcement_text');
 
@@ -109,14 +140,23 @@ export function Layout({ children, className }) {
                             &copy; {new Date().getFullYear()} Scafoteam Finland. {t('footer_rights')}
                         </p>
                     </div>
-                    <Link to="/admin" className={cn(
-                        "flex items-center gap-2 text-xs font-bold transition-all",
-                        isDark ? "text-gray-700 hover:text-scafoteam-gold" : "text-gray-300 hover:text-scafoteam-navy"
-                    )}>
-                        <Lock className="w-3.5 h-3.5" />
-                        {t('admin_login')}
-                    </Link>
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                        <Link to="/privacy-policy" className={cn(
+                            "text-xs font-bold transition-all",
+                            isDark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-scafoteam-navy"
+                        )}>
+                            {t('privacy_policy_title', 'PRIVĀTUMA POLITIKA')}
+                        </Link>
+                        <Link to="/admin" className={cn(
+                            "flex items-center gap-2 text-xs font-bold transition-all",
+                            isDark ? "text-gray-700 hover:text-scafoteam-gold" : "text-gray-300 hover:text-scafoteam-navy"
+                        )}>
+                            <Lock className="w-3.5 h-3.5" />
+                            {t('admin_login')}
+                        </Link>
+                    </div>
                 </div>
+                <CookieConsent />
             </footer>
         </div>
     );

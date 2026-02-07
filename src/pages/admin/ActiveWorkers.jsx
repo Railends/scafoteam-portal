@@ -242,9 +242,9 @@ export default function ActiveWorkers() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group/table">
-                    <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left border-collapse min-w-[1400px]">
+                <div className="bg-white rounded-[32px] border border-gray-100 shadow-2xl shadow-scafoteam-navy/5 overflow-hidden group/table">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50 border-b border-gray-100">
                                     <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32">{t('admin_project')}</th>
@@ -394,7 +394,12 @@ export default function ActiveWorkers() {
                         worker={selectedWorker}
                         isOpen={!!selectedWorker}
                         onClose={() => setSelectedWorker(null)}
-                        onUpdate={loadData}
+                        onUpdate={(updated) => {
+                            loadData();
+                            if (updated && updated.id === selectedWorker?.id) {
+                                setSelectedWorker(updated);
+                            }
+                        }}
                     />
                 )}
 

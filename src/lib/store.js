@@ -62,6 +62,14 @@ const mapWorkerFromDB = (w) => {
 };
 
 export const workerStore = {
+    generatePassword: () => {
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+        let retVal = "";
+        for (let i = 0, n = charset.length; i < 8; ++i) {
+            retVal += charset.charAt(Math.floor(Math.random() * n));
+        }
+        return retVal;
+    },
     getAll: async () => {
         const { data, error } = await supabase
             .from('workers')
@@ -87,41 +95,23 @@ export const workerStore = {
     add: async (workerData) => {
         try {
             // 1. Create Supabase Auth user
-            const tempPassword = Math.random().toString(36).slice(-10) + '123!';
-            let authData, authError;
+            const tempPassword = workerStore.generatePassword() + '123!';
 
-            if (supabaseAdmin) {
-                // Use Admin API to bypass rate limits and auto-confirm email
-                console.log('Using Admin API for worker creation');
-                const result = await supabaseAdmin.auth.admin.createUser({
-                    email: workerData.email,
-                    password: tempPassword,
-                    email_confirm: true,
-                    user_metadata: {
+            // NOTE: Administrative user creation without service_role is limited.
+            // In a production app, this should be done via a Supabase Edge Function to auto-confirm.
+            const result = await supabase.auth.signUp({
+                email: workerData.email,
+                password: tempPassword,
+                options: {
+                    data: {
                         name: workerData.firstName,
                         surname: workerData.lastName,
                         role: workerData.role || 'worker'
                     }
-                });
-                authData = result.data;
-                authError = result.error;
-            } else {
-                // Fallback to client-side sign up (subject to rate limits)
-                console.log('Using Standard API for worker creation (subject to rate limits)');
-                const result = await supabase.auth.signUp({
-                    email: workerData.email,
-                    password: tempPassword,
-                    options: {
-                        data: {
-                            name: workerData.firstName,
-                            surname: workerData.lastName,
-                            role: workerData.role || 'worker'
-                        }
-                    }
-                });
-                authData = result.data;
-                authError = result.error;
-            }
+                }
+            });
+            const authData = result.data;
+            const authError = result.error;
 
             if (authError) throw authError;
 
@@ -183,10 +173,6 @@ export const workerStore = {
         schemaFallbackFields.forEach(field => {
             if (payload[field] !== undefined) {
                 fallbackUpdates[field] = payload[field];
-                // We don't delete from payload yet, we'll try to update both or handle it smartly?
-                // Actually, if we try to update a non-existent column, it throws.
-                // So we MUST remove it from payload if we suspect it's missing.
-                // To be safe given the errors, let's remove them from top-level payload.
                 delete payload[field];
             }
         });
@@ -202,9 +188,11 @@ export const workerStore = {
             const { data: current } = await supabase.from('workers').select('admin_data').eq('id', id).single();
             const currentAdminData = current?.admin_data || {};
 
-            // Password obfuscation logic
+            // Password obfuscation and Auth Sync logic
             if (incomingAdminData.password) {
                 const pass = incomingAdminData.password;
+
+                // If it's a new plain password, obfuscate for DB storage (fallback)
                 if (!pass.startsWith('obf:')) {
                     incomingAdminData.password = 'obf:' + btoa(pass);
                 }
@@ -246,7 +234,7 @@ export const workerStore = {
             .select()
             .single();
         handleSupabaseError(error, 'addDocument');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
     deleteDocument: async (workerId, documentId) => {
@@ -261,7 +249,7 @@ export const workerStore = {
             .select()
             .single();
         handleSupabaseError(error, 'deleteDocument');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
     addFolder: async (workerId, folderName) => {
@@ -315,7 +303,7 @@ export const workerStore = {
             .select()
             .single();
         handleSupabaseError(error, 'addContract');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
     deleteContract: async (workerId, contractId) => {
@@ -330,22 +318,17 @@ export const workerStore = {
             .select()
             .single();
         handleSupabaseError(error, 'deleteContract');
-        return data;
+        return mapWorkerFromDB(data);
     },
 
-    signContract: async (workerId, contractId, signature, content) => {
+    signContract: async (workerId, contractId, signature, fileContent) => {
         const { data: worker } = await supabase.from('workers').select('contracts').eq('id', workerId).single();
-        const contracts = worker?.contracts || [];
-        const contractIndex = contracts.findIndex(c => c.id === contractId);
-
-        if (contractIndex !== -1) {
-            contracts[contractIndex] = {
-                ...contracts[contractIndex],
-                status: 'signed',
-                signature,
-                content,
-                signedAt: new Date().toISOString()
-            };
+        if (worker) {
+            const contracts = worker.contracts.map(c =>
+                c.id === contractId
+                    ? { ...c, status: 'signed', signature, content: fileContent, signedAt: new Date().toISOString() }
+                    : c
+            );
 
             const { data, error } = await supabase
                 .from('workers')
@@ -354,39 +337,48 @@ export const workerStore = {
                 .select()
                 .single();
             handleSupabaseError(error, 'signContract');
-            return data;
+            return mapWorkerFromDB(data);
         }
         return null;
     },
 
     login: async (identifier, password) => {
-        // First try standard Supabase Auth login
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // Perform standard Supabase Auth login
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
             email: identifier,
             password: password
         });
 
-        if (error) {
-            console.warn('Auth Login Failed:', error.message);
+        if (authError) {
+            console.error('Login failed:', authError.message);
             return null;
         }
 
-        // If auth succeeded, fetch the associated worker record
+        // Auth succeeded, fetch the associated worker record
         const { data: worker, error: workerError } = await supabase
             .from('workers')
             .select('*')
-            .eq('user_id', data.user.id)
+            .eq('id', data.user.id)
             .single();
 
-        if (workerError) {
-            console.error('Worker Record Fetch Failed:', workerError);
+        if (workerError || !worker) {
+            console.warn('Auth record found but worker profile missing');
             return null;
         }
 
-        // Log successful login
-        await this.logAction(worker.id, 'LOGIN', { method: 'AUTH' });
-
+        await workerStore.logAction(worker.id, 'LOGIN', { method: 'AUTH_SUCCESS' });
         return mapWorkerFromDB(worker);
+    },
+
+    exportData: async (workerId) => {
+        const { data, error } = await supabase
+            .from('workers')
+            .select('*, audit_logs(*), project_participants(*)')
+            .eq('id', workerId)
+            .single();
+
+        handleSupabaseError(error, 'exportWorkerData');
+        return data;
     },
 
     logAction: async (workerId, action, details = {}) => {
@@ -416,10 +408,10 @@ export const projectStore = {
         handleSupabaseError(error, 'getAllProjects');
         return data || [];
     },
-    add: async (name, clientId = null) => {
+    add: async (name, clientId = null, extra = {}) => {
         const { data, error } = await supabase
             .from('projects')
-            .insert([{ name, status: 'active', client_id: clientId }])
+            .insert([{ name, status: 'active', client_id: clientId, ...extra }])
             .select()
             .single();
         handleSupabaseError(error, 'addProject');
@@ -648,6 +640,77 @@ export const residenceStore = {
     }
 };
 
+export const vehicleStore = {
+    getAll: async () => {
+        const { data, error } = await supabase
+            .from('vehicles')
+            .select('*, workers(name, surname)')
+            .order('plate_number');
+        handleSupabaseError(error, 'getAllVehicles');
+        return data || [];
+    },
+    add: async (vehicleData) => {
+        const { data, error } = await supabase
+            .from('vehicles')
+            .insert([vehicleData])
+            .select()
+            .single();
+        handleSupabaseError(error, 'addVehicle');
+        return data;
+    },
+    update: async (id, updates) => {
+        const { data, error } = await supabase
+            .from('vehicles')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        handleSupabaseError(error, 'updateVehicle');
+        return data;
+    },
+    delete: async (id) => {
+        const { error } = await supabase.from('vehicles').delete().eq('id', id);
+        handleSupabaseError(error, 'deleteVehicle');
+    },
+    addDocument: async (vehicleId, document) => {
+        const { data: vehicle } = await supabase.from('vehicles').select('documents').eq('id', vehicleId).single();
+        const currentDocs = vehicle?.documents || [];
+        const newDoc = { id: crypto.randomUUID(), date: new Date().toISOString(), ...document };
+
+        const { data, error } = await supabase
+            .from('vehicles')
+            .update({ documents: [...currentDocs, newDoc] })
+            .eq('id', vehicleId)
+            .select()
+            .single();
+        handleSupabaseError(error, 'addVehicleDocument');
+        return data;
+    },
+    deleteDocument: async (vehicleId, documentId) => {
+        const { data: vehicle } = await supabase.from('vehicles').select('documents').eq('id', vehicleId).single();
+        const currentDocs = vehicle?.documents || [];
+        const filteredDocs = currentDocs.filter(d => d.id !== documentId);
+
+        const { data, error } = await supabase
+            .from('vehicles')
+            .update({ documents: filteredDocs })
+            .eq('id', vehicleId)
+            .select()
+            .single();
+        handleSupabaseError(error, 'deleteVehicleDocument');
+        return data;
+    },
+    getHolderResidence: async (workerId) => {
+        if (!workerId) return null;
+        const { data, error } = await supabase
+            .from('residence_occupants')
+            .select('residences(address)')
+            .eq('worker_id', workerId)
+            .is('end_date', null)
+            .maybeSingle();
+        return data?.residences;
+    }
+};
 // Extension for projects to handle participants
 export const projectParticipantsStore = {
     getParticipants: async (projectId) => {
@@ -699,29 +762,28 @@ export const projectParticipantsStore = {
 };
 
 export const adminStore = {
-    login: async (username, password) => {
-        console.log('Admin login attempt:', username);
-        const { data: admins } = await supabase.from('admins').select('*').eq('username', username);
-        const admin = admins?.[0];
+    login: async (email, password) => {
+        // Admins should now use Supabase Auth too
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
 
-        if (admin) {
-            let actualPassword = admin.password;
-            if (admin.password && admin.password.startsWith('obf:')) {
-                try {
-                    actualPassword = atob(admin.password.substring(4));
-                } catch (e) {
-                    actualPassword = admin.password;
-                }
-            }
-            if (actualPassword === password) return {
-                id: admin.id,
-                username: admin.username,
-                role: admin.role,
-                full_name: admin.full_name
-            };
+        if (error) return null;
 
+        // Check if user has admin role in metadata
+        const userRole = data.user.user_metadata?.role;
+        if (userRole !== 'admin' && userRole !== 'superadmin') {
+            await supabase.auth.signOut();
+            return null;
         }
-        return null;
+
+        return {
+            id: data.user.id,
+            email: data.user.email,
+            role: userRole,
+            full_name: data.user.user_metadata?.name || data.user.email
+        };
     },
 
     getAll: async () => {

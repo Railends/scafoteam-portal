@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BrandLogo } from '../common/BrandLogo';
+import { supabase } from '@/lib/supabase';
 
 
 
-import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings, Home } from 'lucide-react';
+import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings, Home, Info } from 'lucide-react';
 
 export function AdminLayout({ children }) {
     const { t } = useTranslation();
@@ -18,7 +19,62 @@ export function AdminLayout({ children }) {
     const adminUser = JSON.parse(localStorage.getItem('scafoteam_admin_user') || '{}');
     const isSuperAdmin = adminUser.role === 'superadmin';
     const [adminMode, setAdminMode] = useState('HR'); // 'HR' or 'EMPLOYER'
+    const [dynamicAlerts, setDynamicAlerts] = useState([]);
 
+    useEffect(() => {
+        const fetchAlerts = async () => {
+            try {
+                const { data: workerData } = await supabase.from('workers').select('id, name, surname, admin_data');
+                const { data: vehicleData } = await supabase.from('vehicles').select('id, plate_number, make, model, inspection_expiry');
+
+                const newAlerts = [];
+                const today = new Date();
+
+                // Contract Expiry Alerts (7 days)
+                workerData?.forEach(w => {
+                    const expiry = w.admin_data?.contractEnd;
+                    if (expiry) {
+                        const days = Math.ceil((new Date(expiry) - today) / (1000 * 60 * 60 * 24));
+                        if (days >= 0 && days <= 7) {
+                            newAlerts.push({
+                                id: `c-${w.id}`,
+                                message: `${w.name} ${w.surname}: beidzas līgums pēc ${days} d.`,
+                                severity: 'urgent'
+                            });
+                        }
+                    }
+                });
+
+                // Vehicle Inspection Alerts (1, 2, 3 months)
+                vehicleData?.forEach(v => {
+                    const expiry = v.inspection_expiry;
+                    if (expiry) {
+                        const expiryDate = new Date(expiry);
+                        const monthsDiff = (expiryDate.getFullYear() - today.getFullYear()) * 12 + (expiryDate.getMonth() - today.getMonth());
+
+                        // Calculate days for more precise urgent/warning
+                        const daysDiff = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+                        if (daysDiff >= 0 && daysDiff <= 90) { // Check for 3 months (approx 90 days)
+                            newAlerts.push({
+                                id: `v-${v.id}`,
+                                message: `${v.make} ${v.model} (${v.plate_number}): TA pēc ${daysDiff} d.`,
+                                severity: daysDiff <= 30 ? 'urgent' : 'warning' // Urgent if <= 1 month, warning otherwise
+                            });
+                        }
+                    }
+                });
+
+                setDynamicAlerts(newAlerts);
+            } catch (err) {
+                console.error('Alert fetch error:', err);
+            }
+        };
+
+        fetchAlerts();
+        const interval = setInterval(fetchAlerts, 300000); // Refresh every 5 min
+        return () => clearInterval(interval);
+    }, []);
     const handleLogout = () => {
         localStorage.removeItem('scafoteam_admin_auth');
         navigate('/');
@@ -40,26 +96,59 @@ export function AdminLayout({ children }) {
         // { label: 'Stats', path: '/admin/dashboard/stats', icon: PieChart, mode: 'EMPLOYER' },
     ];
 
+    // Placeholder alert logic - will be dynamic in real use
+    const alerts = [
+        { id: 1, type: 'contract', message: 'Jānim Bērziņam beidzas līgums pēc 7 dienām', severity: 'urgent' },
+        { id: 2, type: 'inspection', message: 'VW GOLV (AA-1234) TA beidzas pēc 1 mēneša', severity: 'warning' }
+    ];
+
+    const hasUrgent = dynamicAlerts.some(a => a.severity === 'urgent');
+    const hasWarning = dynamicAlerts.some(a => a.severity === 'warning');
+    const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+
     const NavLinks = ({ onClick }) => (
         <>
             {navItems.filter(item => item.mode === adminMode).map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
+                const isResidences = item.path === '/admin/dashboard/residences';
+                const isFleetActive = location.pathname === '/admin/dashboard/fleet';
+
                 return (
-                    <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={onClick}
-                        className={cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium",
-                            isActive
-                                ? "bg-white/10 text-white shadow-sm"
-                                : "text-gray-300 hover:bg-white/5 hover:text-white"
+                    <React.Fragment key={item.path}>
+                        <Link
+                            to={item.path}
+                            onClick={onClick}
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium",
+                                isActive
+                                    ? "bg-white/10 text-white shadow-sm"
+                                    : "text-gray-300 hover:bg-white/5 hover:text-white"
+                            )}
+                        >
+                            <Icon className="w-5 h-5" />
+                            {item.label}
+                        </Link>
+
+                        {/* Conditional Sub-menu for Autoparks when Residences is active or selected */}
+                        {isResidences && (isActive || isFleetActive) && (
+                            <div className="ml-6 mt-1 border-l-2 border-white/10 pl-2 space-y-1 animate-in slide-in-from-left-2 duration-200">
+                                <Link
+                                    to="/admin/dashboard/fleet"
+                                    onClick={onClick}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-xs font-bold uppercase tracking-wider",
+                                        isFleetActive
+                                            ? "bg-scafoteam-accent text-scafoteam-navy shadow-sm"
+                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    )}
+                                >
+                                    <Package className="w-4 h-4" />
+                                    Autoparks
+                                </Link>
+                            </div>
                         )}
-                    >
-                        <Icon className="w-5 h-5" />
-                        {item.label}
-                    </Link>
+                    </React.Fragment>
                 )
             })}
         </>
@@ -67,7 +156,7 @@ export function AdminLayout({ children }) {
 
     return (
         <div className="min-h-screen flex bg-gray-100 font-sans">
-            {/* Desktop Sidebar */}
+            {/* Desktop Sidebar (Nav) */}
             <aside className="w-64 bg-scafoteam-navy text-white flex-shrink-0 hidden md:flex flex-col border-r border-white/5 shadow-2xl">
                 <div className="p-6 border-b border-white/10">
                     <div className="flex items-center justify-center h-12 overflow-hidden px-4">
@@ -192,6 +281,77 @@ export function AdminLayout({ children }) {
 
 
                     <div className="flex items-center gap-1 sm:gap-3">
+                        {/* Notifications Popover */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsAlertsOpen(!isAlertsOpen)}
+                                className={cn(
+                                    "w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95 relative",
+                                    isAlertsOpen ? "bg-scafoteam-navy text-white shadow-lg" :
+                                        hasUrgent ? "bg-red-500 text-white border-red-600 shadow-red-200" :
+                                            hasWarning ? "bg-orange-500 text-white border-orange-600 shadow-orange-200" :
+                                                "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50"
+                                )}
+                                title="Paziņojumi"
+                            >
+                                <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+                                {dynamicAlerts.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-scafoteam-accent text-scafoteam-navy text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                                        {dynamicAlerts.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            <AnimatePresence>
+                                {isAlertsOpen && (
+                                    <>
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="fixed inset-0 z-40 bg-transparent"
+                                            onClick={() => setIsAlertsOpen(false)}
+                                        />
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                            className="absolute right-0 mt-3 w-80 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                                        >
+                                            <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
+                                                <h3 className="text-[10px] font-black text-scafoteam-navy uppercase tracking-widest">Paziņojumi ({dynamicAlerts.length})</h3>
+                                                <X className="w-3.5 h-3.5 text-gray-400 cursor-pointer" onClick={() => setIsAlertsOpen(false)} />
+                                            </div>
+                                            <div className="max-h-[400px] overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                                                {dynamicAlerts.length === 0 ? (
+                                                    <div className="py-8 text-center">
+                                                        <p className="text-xs text-gray-400 font-medium italic">Nav jaunu paziņojumu</p>
+                                                    </div>
+                                                ) : (
+                                                    dynamicAlerts.map(alert => (
+                                                        <div
+                                                            key={alert.id}
+                                                            className={cn(
+                                                                "p-3 rounded-xl border text-[11px] font-bold leading-relaxed shadow-sm",
+                                                                alert.severity === 'urgent'
+                                                                    ? "bg-red-50 border-red-100 text-red-700"
+                                                                    : "bg-orange-50 border-orange-100 text-orange-700"
+                                                            )}
+                                                        >
+                                                            {alert.message}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                            <div className="p-3 bg-gray-50/50 border-t border-gray-50">
+                                                <p className="text-[8px] text-gray-400 font-black uppercase text-center">Informācija tiek atjaunota automātiski</p>
+                                            </div>
+                                        </motion.div>
+                                    </>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
                         <LanguageSwitcher />
 
                         <Link

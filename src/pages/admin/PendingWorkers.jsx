@@ -238,12 +238,13 @@ export default function PendingWorkers() {
                                                         return (
                                                             <div className="relative group/tooltip">
                                                                 <AlertTriangle className="w-4 h-4 text-orange-400 cursor-help" />
-                                                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 bg-gray-900 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 shadow-xl pointer-events-none">
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-900 text-white text-[10px] p-3 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] shadow-xl pointer-events-none">
                                                                     <div className="font-bold mb-1 uppercase tracking-wider text-orange-300">{t('missing_info')}:</div>
                                                                     <ul className="list-disc list-inside space-y-0.5 text-gray-300">
                                                                         {missing.map((m, i) => <li key={i}>{m}</li>)}
                                                                     </ul>
-                                                                    <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                                                    {/* Arrow pointing down */}
+                                                                    <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
                                                                 </div>
                                                             </div>
                                                         );

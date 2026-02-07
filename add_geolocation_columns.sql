@@ -1,0 +1,7 @@
+-- Add geolocation columns to projects and residences
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_address TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS lat DECIMAL(10, 8);
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS lng DECIMAL(11, 8);
+
+ALTER TABLE residences ADD COLUMN IF NOT EXISTS lat DECIMAL(10, 8);
+ALTER TABLE residences ADD COLUMN IF NOT EXISTS lng DECIMAL(11, 8);

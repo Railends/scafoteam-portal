@@ -4,10 +4,13 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-
 import { Select } from '@/components/ui/Select';
-import { Home, Plus, Users, MapPin, Euro, Filter, Trash2 } from 'lucide-react';
-import { residenceStore, projectStore, workerStore } from '@/lib/store';
+import { Home, Plus, Users, MapPin, Euro, Filter, Trash2, Pencil, Search, Check, Car } from 'lucide-react';
+import { residenceStore, projectStore, workerStore, vehicleStore } from '@/lib/store';
+import { supabase } from '@/lib/supabase';
+import { geocodeAddress, calculateDistance } from '@/lib/geo';
+import { ProjectMap } from '@/components/maps/ProjectMap';
+import { cn } from '@/lib/utils';
 
 export default function Residences() {
     const { t } = useTranslation();
@@ -17,16 +20,78 @@ export default function Residences() {
     const [selectedProject, setSelectedProject] = useState('all');
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [geoLoading, setGeoLoading] = useState(false);
+    const [searchError, setSearchError] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const [vehicles, setVehicles] = useState([]);
+    const [allActiveOccupants, setAllActiveOccupants] = useState([]);
 
     const [newResidence, setNewResidence] = useState({
         address: '',
-        city: '',
+        apartment_number: '',
+        city: '', // kept for compatibility in filtered
         landlord: '',
         capacity: '',
         cost: '',
         description: '',
-        project_id: ''
+        project_id: '',
+        lat: '',
+        lng: ''
     });
+
+    // Debounced geocoding for new/edit residence
+    useEffect(() => {
+        if (newResidence.address.trim().length < 5) {
+            setSearchError(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                setGeoLoading(true);
+                setSearchError(false);
+                const coords = await geocodeAddress(newResidence.address);
+                if (coords && coords.lat !== undefined && coords.lng !== undefined) {
+                    const newLat = coords.lat.toString();
+                    const newLng = coords.lng.toString();
+
+                    setNewResidence(prev => {
+                        if (!prev) return prev;
+                        const updates = {
+                            lat: newLat,
+                            lng: newLng
+                        };
+
+                        // Intelligent snapping: 
+                        // Only snap address if the result has a house number (digit)
+                        // OR if current address is very short (user is just starting)
+                        // This prevents losing "Häränajajanpolku 41" if Nominatim only returns "Häränajajanpolku"
+                        const hasHouseNumber = /\d/.test(coords.address || '');
+                        const prevHasHouseNumber = /\d/.test(prev.address || '');
+
+                        if (coords.address && coords.address !== prev.address) {
+                            if (hasHouseNumber || !prevHasHouseNumber || (prev.address || '').length < 5) {
+                                updates.address = coords.address;
+                            }
+                        }
+                        if (coords.city && coords.city !== prev.city) {
+                            updates.city = coords.city;
+                        }
+                        return { ...prev, ...updates };
+                    });
+                } else {
+                    setSearchError(true);
+                }
+            } catch (err) {
+                console.error('Geocoding effect error:', err);
+                setSearchError(true);
+            } finally {
+                setGeoLoading(false);
+            }
+        }, 1200);
+        return () => clearTimeout(timer);
+    }, [newResidence.address]);
 
     const [selectedResidence, setSelectedResidence] = useState(null);
     const [occupants, setOccupants] = useState([]);
@@ -48,30 +113,25 @@ export default function Residences() {
         loadData();
     }, []);
 
-    const handleViewOccupants = async (residence) => {
-        setSelectedResidence(residence);
-        setOccupantsLoading(true);
-        try {
-            const data = await residenceStore.getOccupants(residence.id);
-            setOccupants(data);
-        } catch (error) {
-            console.error(error);
-            alert('Kļūda ielādējot iemītniekus');
-        } finally {
-            setOccupantsLoading(false);
-        }
-    };
-
     const loadData = async () => {
-        const [resData, projData, workersData] = await Promise.all([
+        const [resData, projData, workersData, vehicleData] = await Promise.all([
             residenceStore.getAll(),
             projectStore.getAll(),
-            workerStore.getAll()
+            workerStore.getAll(),
+            vehicleStore.getAll()
         ]);
-        setResidences(resData);
+
+        // Fetch all active occupants specifically to link vehicles to residences
+        const { data: occData } = await supabase
+            .from('residence_occupants')
+            .select('residence_id, worker_id')
+            .is('end_date', null);
+
+        setResidences(resData || []);
         setProjects(projData || []);
-        // Filter to show only active workers
         setWorkers((workersData || []).filter(w => w.status === 'active'));
+        setVehicles(vehicleData || []);
+        setAllActiveOccupants(occData || []);
     };
 
     const calculateProjectFinancials = async (projectId) => {
@@ -83,12 +143,10 @@ export default function Residences() {
         const projectResidences = residences.filter(r => r.project_id === projectId);
         const totalCost = projectResidences.reduce((sum, r) => sum + (parseFloat(r.cost) || 0), 0);
 
-        // Fetch occupants for all residences in this project
         const occupantsPromises = projectResidences.map(r => residenceStore.getOccupants(r.id));
         const allOccupantsArrays = await Promise.all(occupantsPromises);
         const allOccupants = allOccupantsArrays.flat();
 
-        // Calculate total income from active occupants
         const activeOccupants = allOccupants.filter(occ => !occ.end_date);
         const totalIncome = activeOccupants.reduce((sum, occ) => sum + (parseFloat(occ.monthly_rent) || 0), 0);
 
@@ -105,31 +163,65 @@ export default function Residences() {
         }
     }, [selectedProject, residences]);
 
-    const handleCreate = async () => {
+    const handleSave = async () => {
         if (!newResidence.address || !newResidence.project_id) {
             alert('Lūdzu, norādiet adresi un projektu.');
             return;
         }
         setLoading(true);
         try {
-            // Sanitize payload: convert empty strings to null
             const payload = {
-                ...newResidence,
-                capacity: newResidence.capacity === '' ? null : newResidence.capacity,
-                cost: newResidence.cost === '' ? null : newResidence.cost,
-                project_id: newResidence.project_id === '' ? null : newResidence.project_id // Should be caught by validation above but safe to keep
+                address: newResidence.address,
+                apartment_number: newResidence.apartment_number,
+                city: newResidence.city,
+                landlord: newResidence.landlord,
+                capacity: newResidence.capacity === '' ? null : parseInt(newResidence.capacity),
+                cost: newResidence.cost === '' ? null : parseFloat(newResidence.cost),
+                description: newResidence.description,
+                project_id: newResidence.project_id === '' ? null : newResidence.project_id,
+                lat: newResidence.lat === '' ? null : parseFloat(newResidence.lat),
+                lng: newResidence.lng === '' ? null : parseFloat(newResidence.lng)
             };
 
-            await residenceStore.add(payload);
+            if (isEditMode && editId) {
+                await residenceStore.update(editId, payload);
+            } else {
+                await residenceStore.add(payload);
+            }
+
             await loadData();
-            setIsAddOpen(false);
-            setNewResidence({ address: '', city: '', landlord: '', capacity: '', cost: '', description: '', project_id: '' });
+            handleCloseModal();
         } catch (e) {
             console.error(e);
-            alert('Error creating residence: ' + e.message);
+            alert('Error saving residence: ' + e.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEdit = (residence) => {
+        setNewResidence({
+            address: residence.address, // Already full address or will be merged by geocoder
+            apartment_number: residence.apartment_number || '',
+            city: residence.city || '',
+            landlord: residence.landlord || '',
+            capacity: residence.capacity || '',
+            cost: residence.cost || '',
+            description: residence.description || '',
+            project_id: residence.project_id || '',
+            lat: residence.lat || '',
+            lng: residence.lng || ''
+        });
+        setEditId(residence.id);
+        setIsEditMode(true);
+        setIsAddOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsAddOpen(false);
+        setIsEditMode(false);
+        setEditId(null);
+        setNewResidence({ address: '', apartment_number: '', city: '', landlord: '', capacity: '', cost: '', description: '', project_id: '', lat: '', lng: '' });
     };
 
     const handleDelete = async (residenceId) => {
@@ -140,7 +232,6 @@ export default function Residences() {
         try {
             await residenceStore.delete(residenceId);
             await loadData();
-            // Recalculate project financials after deletion
             if (selectedProject !== 'all') {
                 await calculateProjectFinancials(selectedProject);
             }
@@ -152,24 +243,26 @@ export default function Residences() {
         }
     };
 
-    const filtered = residences.filter(r => {
-        const matchesSearch = r.address.toLowerCase().includes(search.toLowerCase()) ||
-            (r.city || '').toLowerCase().includes(search.toLowerCase());
-        const matchesProject = selectedProject === 'all' || r.project_id === selectedProject;
-        return matchesSearch && matchesProject;
-    });
+    const handleViewOccupants = async (residence) => {
+        setSelectedResidence(residence);
+        setOccupantsLoading(true);
+        try {
+            const data = await residenceStore.getOccupants(residence.id);
+            setOccupants(data || []);
+        } catch (error) {
+            console.error(error);
+            alert('Kļūda ielādējot iemītniekus');
+        } finally {
+            setOccupantsLoading(false);
+        }
+    };
 
     const handleAddOccupant = async () => {
         if (!newOccupant.worker_id || !newOccupant.start_date) {
             alert('Lūdzu, izvēlieties darbinieku un sākuma datumu.');
             return;
         }
-
-        // Check if worker is already assigned to an active residence
-        const workerAlreadyAssigned = occupants.some(
-            occ => occ.worker_id === newOccupant.worker_id && !occ.end_date
-        );
-
+        const workerAlreadyAssigned = occupants.some(occ => occ.worker_id === newOccupant.worker_id && !occ.end_date);
         if (workerAlreadyAssigned) {
             alert('Šis darbinieks jau ir piesaistīts šim dzīvoklim!');
             return;
@@ -183,16 +276,14 @@ export default function Residences() {
                 start_date: newOccupant.start_date,
                 monthly_rent: newOccupant.monthly_rent === '' ? null : parseFloat(newOccupant.monthly_rent)
             });
-            // Reload occupants
             const data = await residenceStore.getOccupants(selectedResidence.id);
-            setOccupants(data);
+            setOccupants(data || []);
             setIsAddingOccupant(false);
             setNewOccupant({
                 worker_id: '',
                 start_date: new Date().toISOString().split('T')[0],
                 monthly_rent: ''
             });
-            // Also reload residences to update the count on the card
             await loadData();
         } catch (error) {
             console.error(error);
@@ -209,10 +300,8 @@ export default function Residences() {
         setOccupantsLoading(true);
         try {
             await residenceStore.deleteOccupant(occupantId);
-            // Reload occupants
             const data = await residenceStore.getOccupants(selectedResidence.id);
-            setOccupants(data);
-            // Reload residences to update the count
+            setOccupants(data || []);
             await loadData();
         } catch (error) {
             console.error(error);
@@ -221,6 +310,58 @@ export default function Residences() {
             setOccupantsLoading(false);
         }
     };
+
+    const handleHealLocations = async () => {
+        const withoutGeo = residences.filter(r => !r.lat || !r.lng);
+        if (withoutGeo.length === 0) {
+            alert('Visām dzīvesvietām jau ir lokācija!');
+            return;
+        }
+
+        if (!confirm(`Vai vēlaties automātiski atrast lokāciju ${withoutGeo.length} dzīvokļiem?`)) return;
+
+        setLoading(true);
+        let count = 0;
+        try {
+            for (const res of withoutGeo) {
+                // Combine existing address and city (if any) for better search
+                const searchString = res.address + (res.city ? ', ' + res.city : '');
+                const coords = await geocodeAddress(searchString);
+
+                if (coords) {
+                    // CRITICAL: Only send valid database columns to update
+                    const cleanedUpdate = {
+                        address: coords.address || res.address,
+                        lat: coords.lat,
+                        lng: coords.lng
+                    };
+                    // Only send city if we specifically want to clear it (we do)
+                    if (res.city) cleanedUpdate.city = null;
+
+                    await residenceStore.update(res.id, cleanedUpdate);
+                    count++;
+                }
+                // Sleep slightly to respect Nominatim rate limit
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            await loadData();
+            alert(`Sistēma veiksmīgi atrada lokāciju ${count} no ${withoutGeo.length} dzīvokļiem.`);
+        } catch (error) {
+            console.error('Heal locations error:', error);
+            alert('Kļūda masveida apstrādē: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filtered = residences.filter(r => {
+        const address = r.address || '';
+        const city = r.city || '';
+        const matchesSearch = address.toLowerCase().includes(search.toLowerCase()) ||
+            city.toLowerCase().includes(search.toLowerCase());
+        const matchesProject = selectedProject === 'all' || r.project_id === selectedProject;
+        return matchesSearch && matchesProject;
+    });
 
     return (
         <AdminLayout>
@@ -244,8 +385,21 @@ export default function Residences() {
                             ]}
                             placeholder="Filtrēt pēc projekta"
                         />
+                        {residences.some(r => !r.lat || !r.lng) && (
+                            <Button
+                                onClick={handleHealLocations}
+                                variant="outline"
+                                className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                                disabled={loading}
+                            >
+                                <MapPin className="w-4 h-4 mr-2" /> Labot lokācijas
+                            </Button>
+                        )}
                         <Button
-                            onClick={() => setIsAddOpen(true)}
+                            onClick={() => {
+                                handleCloseModal();
+                                setIsAddOpen(true);
+                            }}
                             className="bg-scafoteam-navy hover:bg-scafoteam-navy/90"
                         >
                             <Plus className="w-4 h-4 mr-2" /> Pievienot
@@ -253,7 +407,6 @@ export default function Residences() {
                     </div>
                 </div>
 
-                {/* Project Financial Summary */}
                 {selectedProject !== 'all' && (() => {
                     const projectResidences = filtered;
                     const isProfit = projectFinancials.balance >= 0;
@@ -263,24 +416,30 @@ export default function Residences() {
                             <h2 className="font-bold text-lg mb-4 text-scafoteam-navy">
                                 Projekta finansiālais kopsavilkums - {projects.find(p => p.id === selectedProject)?.name}
                             </h2>
-                            <div className="grid grid-cols-4 gap-6">
-                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
                                     <p className="text-sm text-gray-600 mb-1">Dzīvokļu skaits</p>
                                     <p className="text-2xl font-bold text-scafoteam-navy">{projectResidences.length}</p>
                                 </div>
-                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                                    <p className="text-sm text-gray-600 mb-1">Brīvās vietas</p>
+                                    <p className="text-2xl font-bold text-blue-600">
+                                        {projectResidences.reduce((sum, r) => sum + (Math.max(0, (r.capacity || 0) - (r.occupants || 0))), 0)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">Gultas vietas</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
                                     <p className="text-sm text-gray-600 mb-1">Ieņēmumi (mēnesī)</p>
                                     <p className="text-2xl font-bold text-green-700">€{projectFinancials.income.toFixed(2)}</p>
-                                    <p className="text-xs text-gray-500 mt-1">No aktīvajiem iemītniekiem</p>
                                 </div>
-                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
                                     <p className="text-sm text-gray-600 mb-1">Izmaksas (mēnesī)</p>
                                     <p className="text-2xl font-bold text-red-700">€{projectFinancials.cost.toFixed(2)}</p>
                                 </div>
-                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
                                     <p className="text-sm text-gray-600 mb-1">Bilance</p>
-                                    <p className={`text-3xl font-bold ${isProfit ? 'text-green-700' : 'text-red-700'}`}>
-                                        {isProfit ? '+' : ''}€{projectFinancials.balance.toFixed(2)}
+                                    <p className={`text-2xl font-bold ${isProfit ? 'text-green-700' : 'text-red-700'}`}>
+                                        €{projectFinancials.balance.toFixed(2)}
                                     </p>
                                 </div>
                             </div>
@@ -294,292 +453,261 @@ export default function Residences() {
                             Nav atrasti ieraksti.
                         </div>
                     ) : (
-                        filtered.map(residence => (
-                            <div key={residence.id} className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="bg-blue-50 p-3 rounded-lg">
-                                        <Home className="w-6 h-6 text-scafoteam-navy" />
-                                    </div>
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${residence.occupants >= residence.capacity && residence.capacity > 0
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-green-100 text-green-700'
-                                        }`}>
-                                        {residence.occupants} / {residence.capacity || '-'} vietas
-                                    </span>
-                                </div>
+                        filtered.map(residence => {
+                            const project = projects.find(p => p.id === residence.project_id);
+                            const distance = project && project.lat && project.lng && residence.lat && residence.lng
+                                ? calculateDistance(project.lat, project.lng, residence.lat, residence.lng)
+                                : null;
 
-                                <h3 className="font-bold text-lg text-scafoteam-navy mb-1">{residence.address}</h3>
-                                <p className="text-gray-500 text-sm mb-4">{residence.city}</p>
-
-                                {residence.projectName && (
-                                    <div className="mb-4">
-                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 uppercase tracking-widest">
-                                            {residence.projectName}
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2 text-sm text-gray-600">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4" />
-                                        <span>{residence.landlord || 'Nav norādīts izīrētājs'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Euro className="w-4 h-4" />
-                                        <span>{residence.cost ? `${residence.cost} €/mēn` : '-'}</span>
-                                    </div>
-                                    <div className="text-xs italic text-gray-400">
-                                        💡 Skatīt detalizētu bilanci: "Skatīt iemītniekus"
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 pt-4 border-t flex justify-end gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleViewOccupants(residence)}
-                                    >
-                                        Skatīt iemītniekus
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleDelete(residence.id)}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-
-            <Modal
-                isOpen={isAddOpen}
-                onClose={() => setIsAddOpen(false)}
-                title="Pievienot Dzīvesvietu"
-                className="max-w-md"
-            >
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Adrese</label>
-                        <Input
-                            value={newResidence.address}
-                            onChange={e => setNewResidence({ ...newResidence, address: e.target.value })}
-                            placeholder="Ielas nosaukums, mājas nr."
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Pilsēta</label>
-                            <Input
-                                value={newResidence.city}
-                                onChange={e => setNewResidence({ ...newResidence, city: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ietilpība (vietas)</label>
-                            <Input
-                                type="number"
-                                value={newResidence.capacity}
-                                onChange={e => setNewResidence({ ...newResidence, capacity: e.target.value })}
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Izīrētājs</label>
-                        <Input
-                            value={newResidence.landlord}
-                            onChange={e => setNewResidence({ ...newResidence, landlord: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Izmaksas (EUR/mēn)</label>
-                        <Input
-                            type="number"
-                            value={newResidence.cost}
-                            onChange={e => setNewResidence({ ...newResidence, cost: e.target.value })}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Projekts *</label>
-                        <Select
-                            value={newResidence.project_id}
-                            onChange={e => setNewResidence({ ...newResidence, project_id: e.target.value })}
-                            options={[
-                                { value: '', label: 'Izvēlies projektu' },
-                                ...projects.map(p => ({ value: p.id, label: p.name }))
-                            ]}
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-3 mt-6">
-                        <Button variant="ghost" onClick={() => setIsAddOpen(false)}>{t('cancel')}</Button>
-                        <Button
-                            className="bg-scafoteam-navy text-white"
-                            onClick={handleCreate}
-                            disabled={loading}
-                        >
-                            {loading ? 'Saglabā...' : t('save')}
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* Occupants Modal */}
-            <Modal
-                isOpen={!!selectedResidence}
-                onClose={() => {
-                    setSelectedResidence(null);
-                    setIsAddingOccupant(false);
-                }}
-                title={`Iemītnieki - ${selectedResidence?.address || ''}`}
-                className="max-w-2xl"
-            >
-                <div className="space-y-4">
-                    {/* Financial Balance */}
-                    {selectedResidence && (() => {
-                        const activeOccupants = occupants.filter(occ => !occ.end_date);
-                        const totalIncome = activeOccupants.reduce((sum, occ) => sum + (parseFloat(occ.monthly_rent) || 0), 0);
-                        const residenceCost = parseFloat(selectedResidence.cost) || 0;
-                        const balance = totalIncome - residenceCost;
-                        const isProfit = balance >= 0;
-
-                        return (
-                            <div className={`p-4 rounded-lg border-2 ${isProfit ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
-                                <h3 className="font-bold text-sm mb-2">Finansiālais aprēķins (mēnesī)</h3>
-                                <div className="grid grid-cols-3 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-gray-600">Ieņēmumi (īre)</p>
-                                        <p className="font-bold text-green-700">€{totalIncome.toFixed(2)}</p>
-                                        <p className="text-xs text-gray-500">{activeOccupants.length} aktīvi iemītnieki</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-600">Izmaksas (īre)</p>
-                                        <p className="font-bold text-red-700">€{residenceCost.toFixed(2)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-600">Bilance</p>
-                                        <p className={`font-bold text-lg ${isProfit ? 'text-green-700' : 'text-red-700'}`}>
-                                            {isProfit ? '+' : ''}€{balance.toFixed(2)}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-medium text-gray-500">Saraksts</h3>
-                        {!isAddingOccupant && (
-                            <Button size="sm" onClick={() => setIsAddingOccupant(true)} className="flex items-center gap-1">
-                                <Plus className="w-4 h-4" /> Pievienot
-                            </Button>
-                        )}
-                    </div>
-
-                    {isAddingOccupant && (
-                        <div className="bg-gray-50 p-4 rounded-lg border space-y-3">
-                            <h4 className="font-semibold text-sm">Jauns iemītnieks</h4>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium mb-1">Darbinieks</label>
-                                    <Select
-                                        value={newOccupant.worker_id}
-                                        onChange={e => {
-                                            const workerId = e.target.value;
-                                            const selectedWorker = workers.find(w => w.id === workerId);
-                                            setNewOccupant({
-                                                ...newOccupant,
-                                                worker_id: workerId,
-                                                // Auto-fill with default 360 EUR or worker's accommodation cost if available
-                                                monthly_rent: workerId ? (selectedWorker?.accommodation_cost || '360') : ''
-                                            });
-                                        }}
-                                        options={[
-                                            { value: '', label: 'Izvēlies darbinieku' },
-                                            ...workers.map(w => ({ value: w.id, label: `${w.name} ${w.surname}` }))
-                                        ]}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium mb-1">Sākuma datums</label>
-                                    <Input
-                                        type="date"
-                                        value={newOccupant.start_date}
-                                        onChange={e => setNewOccupant({ ...newOccupant, start_date: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium mb-1">Mēneša īre (EUR)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={newOccupant.monthly_rent}
-                                        onChange={e => setNewOccupant({ ...newOccupant, monthly_rent: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2 text-sm">
-                                <Button variant="ghost" size="sm" onClick={() => setIsAddingOccupant(false)}>Atcelt</Button>
-                                <Button size="sm" onClick={handleAddOccupant}>Saglabāt</Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {occupantsLoading ? (
-                        <div className="text-center py-8">Ielādē...</div>
-                    ) : occupants.length === 0 && !isAddingOccupant ? (
-                        <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                            Šajā dzīvesvietā nav reģistrētu iemītnieku.
-                        </div>
-                    ) : (
-                        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {occupants.map((occ) => (
-                                <div key={occ.id} className="p-3 bg-white border rounded-lg flex justify-between items-center shadow-sm">
-                                    <div className="flex-1">
-                                        <p className="font-bold text-scafoteam-navy">
-                                            {occ.workers?.name} {occ.workers?.surname}
-                                        </p>
-                                        <div className="text-xs text-gray-500 flex gap-3">
-                                            <span>No: {new Date(occ.start_date).toLocaleDateString()}</span>
-                                            {occ.end_date && <span>Līdz: {new Date(occ.end_date).toLocaleDateString()}</span>}
-                                            {occ.monthly_rent && (
-                                                <span className="font-semibold text-green-700">
-                                                    Īre: €{parseFloat(occ.monthly_rent).toFixed(2)}/mēn
+                            return (
+                                <div key={residence.id} className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="bg-blue-50 p-3 rounded-lg">
+                                            <Home className="w-6 h-6 text-scafoteam-navy" />
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${residence.occupants >= residence.capacity && residence.capacity > 0
+                                                ? 'bg-red-100 text-red-700'
+                                                : 'bg-green-100 text-green-700'
+                                                }`}>
+                                                {residence.occupants} / {residence.capacity || '-'} vietas
+                                            </span>
+                                            {(!residence.lat || !residence.lng) && (
+                                                <span className="text-[9px] font-bold text-orange-500 uppercase flex items-center gap-0.5">
+                                                    <MapPin className="w-2.5 h-2.5" /> Nav lokācijas
                                                 </span>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {!occ.end_date ? (
-                                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase">Aktīvs</span>
-                                        ) : (
-                                            <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-full uppercase">Vēsture</span>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleRemoveOccupant(occ.id)}
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                    <div className="flex flex-col flex-1 min-w-0 px-2 lg:px-0">
+                                        <div className="flex items-center justify-between gap-2 overflow-hidden mb-1">
+                                            <h3 className="font-bold text-scafoteam-navy text-lg leading-tight truncate flex-1"
+                                                title={`${residence.address}${residence.apartment_number ? ` - Dz. ${residence.apartment_number}` : ''}${residence.city ? `, ${residence.city}` : ''}`}>
+                                                {residence.address}
+                                                {residence.apartment_number && (
+                                                    <span className="text-scafoteam-accent mx-2">
+                                                        - Dz. {residence.apartment_number}
+                                                    </span>
+                                                )}
+                                            </h3>
+
+                                            {(() => {
+                                                const resOccupantIds = allActiveOccupants
+                                                    .filter(occ => occ.residence_id === residence.id)
+                                                    .map(occ => occ.worker_id);
+                                                const resVehicles = vehicles.filter(v => v.holder_id && resOccupantIds.includes(v.holder_id));
+
+                                                if (resVehicles.length === 0) return null;
+
+                                                return (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {resVehicles.map(v => (
+                                                            <div
+                                                                key={v.id}
+                                                                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-scafoteam-navy/20 bg-white text-scafoteam-navy shadow-sm"
+                                                                title={`${v.make} ${v.model}`}
+                                                            >
+                                                                <Car className="w-3 h-3 opacity-70" />
+                                                                <span className="text-[9px] font-bold tracking-tighter uppercase">{v.plate_number}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+
+                                    {project && (
+                                        <div className="mb-4">
+                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 uppercase tracking-widest">
+                                                {project.name}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-auto pt-3 flex items-center justify-between border-t border-gray-50">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                <Users className="w-3.5 h-3.5 opacity-60" />
+                                                <span className="truncate max-w-[120px]">{residence.landlord || '-'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs font-bold text-scafoteam-navy">
+                                                <Euro className="w-3.5 h-3.5 opacity-60" />
+                                                <span>{residence.cost ? `${residence.cost} €` : '-'}</span>
+                                            </div>
+                                        </div>
+
+                                        {selectedProject !== 'all' && (() => {
+                                            const currentProject = projects.find(p => p.id === selectedProject);
+                                            if (currentProject?.lat && currentProject?.lng && residence.lat && residence.lng) {
+                                                const dist = calculateDistance(currentProject.lat, currentProject.lng, residence.lat, residence.lng);
+                                                return (
+                                                    <div className="flex flex-col items-end">
+                                                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50/50 rounded-full border border-blue-100/50 text-[10px] font-bold text-blue-600/80 uppercase tracking-tight">
+                                                            <MapPin className="w-2.5 h-2.5" />
+                                                            {dist.toFixed(1)} km
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </div>
+
+                                    <div className="mt-4 pt-4 border-t flex justify-end gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleViewOccupants(residence)}>Iemītnieki</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => handleEdit(residence)}><Pencil className="w-4 h-4" /></Button>
+                                        <Button size="sm" variant="ghost" onClick={() => handleDelete(residence.id)} className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            );
+                        })
                     )}
+                </div>
 
-                    <div className="flex justify-end pt-4 border-t">
-                        <Button variant="ghost" onClick={() => setSelectedResidence(null)}>Aizvērt</Button>
+                {selectedProject !== 'all' && (() => {
+                    const currentProject = projects.find(p => p.id === selectedProject);
+                    if (!currentProject?.lat || !currentProject?.lng) return null;
+
+                    const residencesWithDistance = filtered.map(r => ({
+                        ...r,
+                        distance: calculateDistance(currentProject.lat, currentProject.lng, r.lat, r.lng)
+                    }));
+
+                    // Only show map if there are some residences to display or at least the site
+                    return (
+                        <div className="mt-8 space-y-4 pt-8 border-t">
+                            <div className="flex justify-between items-center px-1">
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Objekta un dzīvokļu izvietojums</h3>
+                                <div className="flex gap-4 text-[10px] font-bold">
+                                    <span className="flex items-center gap-1.5 text-blue-600"><span className="w-2 h-2 rounded-full bg-blue-600"></span> OBJEKTS</span>
+                                    <span className="flex items-center gap-1.5 text-amber-500"><span className="w-2 h-2 rounded-full bg-amber-500"></span> DZĪVESVIETAS</span>
+                                </div>
+                            </div>
+                            <ProjectMap
+                                site={{
+                                    lat: currentProject.lat,
+                                    lng: currentProject.lng,
+                                    name: currentProject.name,
+                                    address: currentProject.site_address
+                                }}
+                                residences={residencesWithDistance}
+                            />
+                        </div>
+                    );
+                })()}
+            </div>
+
+            <Modal
+                isOpen={isAddOpen}
+                onClose={handleCloseModal}
+                title={isEditMode ? "Rediģēt Dzīvesvietu" : "Pievienot Dzīvesvietu"}
+                className="max-w-md"
+            >
+                <div className="space-y-4 pt-4">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2 space-y-2">
+                            <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Adrese (Iela, Pilsēta)</label>
+                                {geoLoading && <span className="text-[10px] text-blue-500 font-bold animate-pulse">Meklē...</span>}
+                            </div>
+                            <Input
+                                value={newResidence.address}
+                                onChange={e => setNewResidence({ ...newResidence, address: e.target.value })}
+                                placeholder="piem. Brīvības iela 1"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dzīvokļa Nr.</label>
+                            <Input
+                                value={newResidence.apartment_number}
+                                onChange={e => setNewResidence({ ...newResidence, apartment_number: e.target.value })}
+                                placeholder="piem. 5"
+                            />
+                        </div>
+                    </div>
+                    {searchError && !geoLoading && <p className="text-[10px] text-red-500 font-bold">Adrese nav atrasta! Lūdzu precizējiet.</p>}
+                    {newResidence.lat && !geoLoading && <p className="text-[10px] text-green-500 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Lokācija fiksēta kartē</p>}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Vietas (Gultas)</label>
+                            <Input type="number" value={newResidence.capacity} onChange={e => setNewResidence({ ...newResidence, capacity: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Īre (€/mēn)</label>
+                            <Input type="number" value={newResidence.cost} onChange={e => setNewResidence({ ...newResidence, cost: e.target.value })} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Izīrētājs</label>
+                            <Input value={newResidence.landlord} onChange={e => setNewResidence({ ...newResidence, landlord: e.target.value })} placeholder="vārds vai uzņēmums" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Projekts</label>
+                            <Select
+                                value={newResidence.project_id}
+                                onChange={e => setNewResidence({ ...newResidence, project_id: e.target.value })}
+                                options={projects.map(p => ({ value: p.id, label: p.name }))}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button variant="ghost" onClick={handleCloseModal}>Atcelt</Button>
+                        <Button className="bg-scafoteam-navy text-white" onClick={handleSave} disabled={loading}>{loading ? 'Saglabā...' : 'Saglabāt'}</Button>
                     </div>
                 </div>
             </Modal>
-        </AdminLayout >
+
+            <Modal
+                isOpen={!!selectedResidence}
+                onClose={() => setSelectedResidence(null)}
+                title={`Iemītnieki - ${selectedResidence?.address}`}
+                className="max-w-2xl"
+            >
+                <div className="space-y-4 pt-4">
+                    {occupantsLoading ? (
+                        <div className="text-center py-8">Ielādē...</div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="font-bold text-scafoteam-navy uppercase tracking-widest text-[10px]">Saraksts</h3>
+                                <Button size="sm" onClick={() => setIsAddingOccupant(!isAddingOccupant)}>
+                                    {isAddingOccupant ? 'Atcelt' : 'Pievienot'}
+                                </Button>
+                            </div>
+                            {isAddingOccupant && (
+                                <div className="p-4 bg-gray-50 rounded-lg border space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Select
+                                            value={newOccupant.worker_id}
+                                            onChange={e => setNewOccupant({ ...newOccupant, worker_id: e.target.value, monthly_rent: workers.find(w => w.id === e.target.value)?.accommodation_cost || '360' })}
+                                            options={[{ value: '', label: 'Izvēlies darbinieku' }, ...workers.map(w => ({ value: w.id, label: `${w.name} ${w.surname}` }))]}
+                                        />
+                                        <Input type="date" value={newOccupant.start_date} onChange={e => setNewOccupant({ ...newOccupant, start_date: e.target.value })} />
+                                        <Input type="number" placeholder="Īre" value={newOccupant.monthly_rent} onChange={e => setNewOccupant({ ...newOccupant, monthly_rent: e.target.value })} />
+                                        <Button onClick={handleAddOccupant} className="w-full">Pievienot</Button>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                {occupants.map(occ => (
+                                    <div key={occ.id} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                                        <div>
+                                            <p className="font-bold text-scafoteam-navy">{occ.workers?.name} {occ.workers?.surname}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-widest">{new Date(occ.start_date).toLocaleDateString()} - {occ.end_date ? new Date(occ.end_date).toLocaleDateString() : 'Tagad'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-green-700">€{parseFloat(occ.monthly_rent || 0).toFixed(2)}</span>
+                                            <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleRemoveOccupant(occ.id)}><Trash2 className="w-4 h-4" /></Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Modal>
+        </AdminLayout>
     );
 }
