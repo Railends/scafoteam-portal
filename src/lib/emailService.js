@@ -67,19 +67,27 @@ export const emailService = {
         try {
             const urgentAlertsList = alerts
                 .filter(a => a.severity === 'urgent')
-                .map(a => `- ${a.message}`)
-                .join('\n');
+                .map(a => `
+                    <div style="margin-bottom: 12px; background-color: #fff5f5; border: 1px solid #fee2e2; border-left: 5px solid #ef4444; padding: 15px; border-radius: 6px;">
+                        <span style="color: #991b1b; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">
+                            ⚠️ ${a.message}
+                        </span>
+                    </div>
+                `)
+                .join('');
 
             if (!urgentAlertsList) return { success: true, message: 'No urgent alerts' };
 
             const templateParams = {
                 to_email: 'office@scafoteam.fi',
                 to_name: 'SCAFOTEAM Office',
-                subject: 'SISTĒMAS BRĪDINĀJUMS: Scafoteam Portal',
+                subject: 'SVARĪGI: Sistēmas Brīdinājumi',
 
-                // Minimal variables for the simplest possible template
+                // Design variables
+                sender_name: 'Scafoteam Portal',
                 time: new Date().toLocaleDateString('lv-LV') + ' ' + new Date().toLocaleTimeString('lv-LV', { hour: '2-digit', minute: '2-digit' }),
                 message: urgentAlertsList,
+                portal_url: (import.meta.env.VITE_APP_URL || window.location.origin) + '/admin',
 
                 reply_to: 'office@scafoteam.fi'
             };
