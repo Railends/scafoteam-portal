@@ -82,10 +82,10 @@ export const emailService = {
                 subject: 'SVARĪGI: Sistēmas Brīdinājumi (Termiņi)',
 
                 // Simple variables for table-based template
-                name: 'Scafoteam Alerts',
+                sender_name: 'Scafoteam Alerts',
                 time: new Date().toLocaleDateString('lv-LV') + ' ' + new Date().toLocaleTimeString('lv-LV', { hour: '2-digit', minute: '2-digit' }),
                 message: urgentAlertsList,
-                portal_url: window.location.origin + '/admin',
+                portal_url: (import.meta.env.VITE_APP_URL || window.location.origin) + '/admin',
 
                 reply_to: 'office@scafoteam.fi'
             };
