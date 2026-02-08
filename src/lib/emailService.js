@@ -3,7 +3,7 @@ import emailjs from '@emailjs/browser';
 /**
  * Email Service using EmailJS
  * 
- * This service handles sending credentials to workers.
+ * This service handles sending credentials to workers and alert reports to office.
  * It uses environment variables for configuration.
  */
 
@@ -42,12 +42,59 @@ export const emailService = {
 
             return {
                 success: true,
-                message: `E-pasts nosūtīts! (ID: ${response.status})`
+                message: `E-pasts nosūtīts! (Status: ${response.status})`
             };
         } catch (error) {
             console.error('EmailJS Error:', error);
-            throw new Error('E-pasta sūtīšana neizdevās. Lūdzu, pārbaudiet EmailJS iestatījumus.');
+            const errorDetail = error?.text || error?.message || JSON.stringify(error);
+            throw new Error(`E-pasta sūtīšana neizdevās: ${errorDetail}. Pārbaudiet EmailJS iestatījumus vai limitus.`);
+        }
+    },
+
+    /**
+     * Sends an urgent alert report to office@scafoteam.fi
+     */
+    sendAlertReport: async (alerts) => {
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+        // Use a dedicated template for alerts, fallback to registration template with a warning
+        const templateId = import.meta.env.VITE_EMAILJS_ALERT_TEMPLATE_ID || import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+
+        if (!serviceId || !templateId || !PUBLIC_KEY) {
+            console.warn('EmailJS not configured for alerts.');
+            return { success: false, message: 'EmailJS Missing' };
+        }
+
+        try {
+            const urgentAlertsList = alerts
+                .filter(a => a.severity === 'urgent')
+                .map(a => `
+                    <p style="margin: 0 0 10px 0; padding: 12px; background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; font-size: 14px; font-family: Arial, sans-serif; border-radius: 4px;">
+                        <strong>⚠️ BRĪDINĀJUMS:</strong> ${a.message}
+                    </p>
+                `)
+                .join('');
+
+            if (!urgentAlertsList) return { success: true, message: 'No urgent alerts' };
+
+            const templateParams = {
+                to_email: 'office@scafoteam.fi',
+                to_name: 'SCAFOTEAM Office',
+                subject: 'SVARĪGI: Sistēmas Brīdinājumi (Termiņi)',
+
+                // Simple variables for table-based template
+                name: 'Scafoteam Alerts',
+                time: new Date().toLocaleDateString('lv-LV') + ' ' + new Date().toLocaleTimeString('lv-LV', { hour: '2-digit', minute: '2-digit' }),
+                message: urgentAlertsList,
+                portal_url: window.location.origin + '/admin',
+
+                reply_to: 'office@scafoteam.fi'
+            };
+
+            await emailjs.send(serviceId, templateId, templateParams);
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to send alert report:', error);
+            throw error;
         }
     }
 };
-

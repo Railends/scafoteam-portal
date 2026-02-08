@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { workerStore } from '@/lib/store';
-import { CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ChevronLeft, ShieldCheck } from 'lucide-react';
 
 const STEPS = [
     { id: 'personal', title: 'personal_info' },
@@ -28,7 +28,7 @@ export default function WorkerRegistration() {
 
     const { register, handleSubmit, control, watch, trigger, setValue, formState: { errors } } = useForm({
         mode: 'onChange',
-        defaultValues: JSON.parse(localStorage.getItem('scafoteam_registration_draft')) || {
+        defaultValues: {
             nationality: '',
             hasFinnishId: 'no',
             hasGreenCard: 'no',
@@ -41,16 +41,7 @@ export default function WorkerRegistration() {
         }
     });
 
-    // Auto-save feature
-    const formData = watch();
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            if (formData && Object.keys(formData).length > 0) {
-                localStorage.setItem('scafoteam_registration_draft', JSON.stringify(formData));
-            }
-        }, 1000);
-        return () => clearTimeout(timeout);
-    }, [formData]);
+    // Auto-save removed as per user request
 
     const hasFinnishId = watch('hasFinnishId');
     const hasHotworks = watch('hasHotworks');
@@ -81,10 +72,13 @@ export default function WorkerRegistration() {
         localStorage.setItem('scafoteam_last_submit', Date.now().toString());
 
         try {
-            await workerStore.add(data);
-            localStorage.removeItem('scafoteam_registration_draft'); // Clear auto-save on success
-            setSubmitted(true);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const result = await workerStore.add(data);
+            if (result.success) {
+                setSubmitted(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                throw new Error(result.error || 'Server error');
+            }
         } catch (e) {
             console.error('Registration failed:', e);
             alert("Kļūda saglabājot datus: " + (e.message || e));
@@ -150,6 +144,7 @@ export default function WorkerRegistration() {
                                                 <Input {...register('name', { required: true, pattern: /^[A-Za-z\s\-\.\,\d\u00C0-\u00FF\u0100-\u017F]+$/ })} placeholder={t('name')} label={t('name')} error={errors.name && (errors.name.type === 'pattern' ? t('latin_only') : t('required'))} />
                                                 <Input {...register('surname', { required: true, pattern: /^[A-Za-z\s\-\.\,\d\u00C0-\u00FF\u0100-\u017F]+$/ })} placeholder={t('surname')} label={t('surname')} error={errors.surname && (errors.surname.type === 'pattern' ? t('latin_only') : t('required'))} />
                                             </div>
+
                                             <Controller
                                                 name="nationality"
                                                 control={control}
@@ -368,14 +363,18 @@ export default function WorkerRegistration() {
                                                 )}
                                             </div>
 
-                                            <div className="flex items-start gap-4 p-6 bg-blue-50/50 rounded-xl border border-blue-100">
-                                                <input type="checkbox" className="mt-1 w-5 h-5 rounded border-gray-300 text-scafoteam-navy focus:ring-scafoteam-navy" {...register('gdpr', { required: true })} />
+                                            <div className="flex items-start gap-4 p-6 bg-blue-50/50 rounded-xl border border-blue-100 shadow-sm transition-all hover:bg-blue-50">
+                                                <input type="checkbox" className="mt-1 w-5 h-5 rounded border-gray-300 text-scafoteam-navy focus:ring-scafoteam-navy cursor-pointer" {...register('gdpr', { required: true })} />
                                                 <div className="text-sm">
-                                                    <span className="block font-medium text-gray-900 mb-1">{t('gdpr_agree')}</span>
-                                                    <p className="text-muted-foreground mb-2">{t('gdpr_text')}</p>
-                                                    <a href="#" className="text-scafoteam-navy hover:underline font-medium inline-flex items-center">
-                                                        {t('gdpr_link')} <ChevronRight className="w-3 h-3 ml-1" />
-                                                    </a>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                                        <span className="font-bold text-scafoteam-navy">{t('gdpr_agree')}</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground mb-3 leading-relaxed">{t('gdpr_text_detailed')}</p>
+                                                    <Link to="/privacy-policy" className="text-scafoteam-navy hover:text-blue-700 hover:underline font-bold inline-flex items-center group">
+                                                        {t('gdpr_link')}
+                                                        <ChevronRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-1" />
+                                                    </Link>
                                                 </div>
                                             </div>
                                             {errors.gdpr && <p className="text-red-500 text-sm font-medium animate-pulse">{t('agree_continue')}</p>}

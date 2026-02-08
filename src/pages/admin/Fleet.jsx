@@ -5,9 +5,12 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Car, FileText, Plus, Search, Trash2, Pencil, Calendar, User, Home, Shield, AlertCircle } from 'lucide-react';
+import { Car, FileText, Plus, Search, Trash2, Pencil, Calendar, User, Home, Shield, AlertCircle, Download, Loader2, Upload } from 'lucide-react';
 import { vehicleStore, workerStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { ocrService } from '@/lib/ocrService';
+import { Scan } from 'lucide-react';
 
 export default function Fleet() {
     const [vehicles, setVehicles] = useState([]);
@@ -17,6 +20,7 @@ export default function Fleet() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     const [newVehicle, setNewVehicle] = useState({
         make: '',
@@ -54,6 +58,7 @@ export default function Fleet() {
             setResidences(resData);
         } catch (error) {
             console.error('Error loading fleet data:', error);
+            toast.error('Neizdevās ielādēt datus');
         } finally {
             setLoading(false);
         }
@@ -61,21 +66,26 @@ export default function Fleet() {
 
     const handleSave = async () => {
         if (!newVehicle.make || !newVehicle.model || !newVehicle.plate_number) {
-            alert('Lūdzu, aizpildiet obligātos laukus (Marka, Modelis, Numurs).');
+            toast.warning('Lūdzu, aizpildiet obligātos laukus (Marka, Modelis, Numurs).');
             return;
         }
 
+        setActionLoading(true);
         try {
             if (isEditMode && editId) {
                 await vehicleStore.update(editId, newVehicle);
+                toast.success('Auto atjaunināts');
             } else {
                 await vehicleStore.add(newVehicle);
+                toast.success('Auto pievienots');
             }
             setIsAddOpen(false);
             resetForm();
             loadData();
         } catch (error) {
-            alert('Kļūda saglabājot: ' + error.message);
+            toast.error('Kļūda saglabājot: ' + error.message);
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -97,9 +107,10 @@ export default function Fleet() {
         if (!confirm('Vai tiešām vēlaties dzēst šo transportlīdzekli?')) return;
         try {
             await vehicleStore.delete(id);
+            toast.success('Auto izdzēsts');
             loadData();
         } catch (error) {
-            alert('Kļūda dzēšot: ' + error.message);
+            toast.error('Kļūda dzēšot: ' + error.message);
         }
     };
 
@@ -114,6 +125,68 @@ export default function Fleet() {
         });
         setIsEditMode(false);
         setEditId(null);
+    };
+
+    const handleDownload = async (doc) => {
+        if (!doc.content) return;
+        try {
+            const url = await vehicleStore.getSignedUrl(doc.content);
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                toast.error('Neizdevās atvērt dokumentu');
+            }
+        } catch (error) {
+            toast.error('Kļūda: ' + error.message);
+        }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        const name = e.target.form.docName.value;
+        if (!file || !name) {
+            toast.warning('Lūdzu, norādiet nosaukumu un izvēlieties failu');
+            return;
+        }
+
+        setActionLoading(true);
+        try {
+            const updatedVehicle = await vehicleStore.addDocument(selectedVehicle.id, {
+                name,
+                content: file
+            });
+            setSelectedVehicle(updatedVehicle);
+            loadData();
+            toast.success('Dokuments pievienots');
+            e.target.form.reset();
+        } catch (error) {
+            toast.error('Kļūda augšupielādējot: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleScanTA = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setActionLoading(true);
+        toast.info('Skenē dokumentu...');
+        try {
+            const text = await ocrService.extractText(file);
+            const date = ocrService.findDate(text);
+            if (date) {
+                setNewVehicle(prev => ({ ...prev, inspection_expiry: date }));
+                toast.success('TA termiņš nolasīts veiksmīgi!');
+            } else {
+                toast.warning('Neizdevās atrast datumu. Lūdzu, ievadiet manuāli.');
+            }
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setActionLoading(false);
+            e.target.value = ''; // Reset input
+        }
     };
 
     const filtered = vehicles.filter(v =>
@@ -202,7 +275,9 @@ export default function Fleet() {
                                                     <span className="text-[9px] font-black uppercase text-gray-400 block mb-1">Tehniskā apskate</span>
                                                     <div className={cn(
                                                         "text-[11px] font-bold flex items-center gap-1.5",
-                                                        daysLeft !== null && daysLeft < 30 ? "text-red-600" : "text-gray-700"
+                                                        daysLeft !== null && daysLeft < 0 ? "text-red-600" :
+                                                            daysLeft !== null && daysLeft <= 7 ? "text-yellow-600" :
+                                                                "text-gray-700"
                                                     )}>
                                                         <Calendar className="w-3.5 h-3.5" />
                                                         {vehicle.inspection_expiry || 'Nav norādīts'}
@@ -266,9 +341,17 @@ export default function Fleet() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
+                            <div className="space-y-1.5 flex-1">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">TA termiņš</label>
-                                <Input type="date" value={newVehicle.inspection_expiry} onChange={e => setNewVehicle({ ...newVehicle, inspection_expiry: e.target.value })} className="h-10 bg-gray-50/50" />
+                                <div className="relative group/scan">
+                                    <Input type="date" value={newVehicle.inspection_expiry} onChange={e => setNewVehicle({ ...newVehicle, inspection_expiry: e.target.value })} className="h-10 bg-gray-50/50 pr-10" />
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                        <input type="file" id="ta-scan-upload" className="hidden" accept="image/*" onChange={handleScanTA} />
+                                        <label htmlFor="ta-scan-upload" className="p-1.5 text-gray-400 hover:text-scafoteam-accent cursor-pointer rounded-lg hover:bg-scafoteam-accent/5 transition-all block" title="Skenēt no attēla">
+                                            <Scan className="w-4 h-4" />
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Īpašnieks</label>
@@ -292,8 +375,8 @@ export default function Fleet() {
                         </div>
 
                         <div className="flex flex-col gap-2 pt-4">
-                            <Button onClick={handleSave} className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white font-black h-12 rounded-xl shadow-lg shadow-scafoteam-navy/20">
-                                SAGLABĀT
+                            <Button onClick={handleSave} disabled={actionLoading} className="bg-scafoteam-navy hover:bg-scafoteam-navy-light text-white font-black h-12 rounded-xl shadow-lg shadow-scafoteam-navy/20">
+                                {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'SAGLABĀT'}
                             </Button>
                             <Button variant="ghost" onClick={() => setIsAddOpen(false)} className="text-gray-400 font-bold hover:text-gray-600">
                                 Atcelt
@@ -323,6 +406,7 @@ export default function Fleet() {
                                         await vehicleStore.update(selectedVehicle.id, { holder_id: newHolderId || null });
                                         loadData();
                                         setSelectedVehicle(prev => ({ ...prev, holder_id: newHolderId }));
+                                        toast.success('Turētājs atjaunināts');
                                     }}
                                     className="bg-white border-gray-200 font-bold text-scafoteam-navy text-[11px] h-8 min-w-[140px]"
                                     options={[
@@ -335,37 +419,47 @@ export default function Fleet() {
 
                         <div className="space-y-3">
                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Pievienotie dokumenti</h4>
-                            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                 {(!selectedVehicle?.documents || selectedVehicle.documents.length === 0) ? (
-                                    <p className="text-xs text-gray-400 font-medium italic p-4 text-center">Nav pievienotu dokumentu</p>
+                                    <div className="py-10 text-center border-2 border-dashed border-gray-100 rounded-2xl">
+                                        <FileText className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-400 font-medium italic">Nav pievienotu dokumentu</p>
+                                    </div>
                                 ) : (
                                     selectedVehicle.documents.map(doc => (
-                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm group">
+                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm group hover:border-scafoteam-accent/30 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-scafoteam-accent/10 flex items-center justify-center">
-                                                    <FileText className="w-4 h-4 text-scafoteam-accent" />
+                                                <div className="w-10 h-10 rounded-xl bg-scafoteam-navy/5 flex items-center justify-center text-scafoteam-navy">
+                                                    <FileText className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs font-bold text-gray-700">{doc.name}</p>
+                                                    <p className="text-xs font-bold text-scafoteam-navy">{doc.name}</p>
                                                     <p className="text-[10px] text-gray-400">{new Date(doc.date).toLocaleDateString('lv-LV')}</p>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={async () => {
-                                                    if (confirm('Dzēst dokumentu?')) {
-                                                        await vehicleStore.deleteDocument(selectedVehicle.id, doc.id);
-                                                        loadData();
-                                                        // Update local selectedVehicle 
-                                                        setSelectedVehicle(prev => ({
-                                                            ...prev,
-                                                            documents: prev.documents.filter(d => d.id !== doc.id)
-                                                        }));
-                                                    }
-                                                }}
-                                                className="p-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleDownload(doc)}
+                                                    className="p-2 text-gray-400 hover:text-scafoteam-accent hover:bg-scafoteam-accent/5 rounded-lg transition-all"
+                                                    title="Lejupielādēt"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (confirm('Dzēst dokumentu?')) {
+                                                            const updated = await vehicleStore.deleteDocument(selectedVehicle.id, doc.id);
+                                                            setSelectedVehicle(updated);
+                                                            loadData();
+                                                            toast.success('Dokuments izdzēsts');
+                                                        }
+                                                    }}
+                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Dzēst"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))
                                 )}
@@ -374,26 +468,47 @@ export default function Fleet() {
 
                         <div className="pt-6 border-t border-gray-100">
                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 mb-3">Pievienot jaunu dokumentu</h4>
-                            <form
-                                className="flex gap-2"
-                                onSubmit={async (e) => {
-                                    e.preventDefault();
-                                    const name = e.target.docName.value;
-                                    if (!name) return;
-                                    const newDoc = await vehicleStore.addDocument(selectedVehicle.id, { name });
-                                    loadData();
-                                    setSelectedVehicle(newDoc); // Error here: store returns full vehicle or doc? 
-                                    // store.addDocument returns full vehicle normally
-                                    e.target.reset();
-                                }}
-                            >
-                                <Input name="docName" placeholder="Dokumenta nosaukums (piem. Apdrošināšana)" className="flex-1 h-10 text-xs" />
-                                <Button type="submit" size="sm" className="bg-scafoteam-accent text-scafoteam-navy font-black text-[10px]">PIEVIENOT</Button>
+                            <form className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Dokumenta nosaukums</label>
+                                    <Input name="docName" placeholder="Piem. Apdrošināšanas polise" className="h-10 text-xs bg-white" />
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="file"
+                                            id="vehicle-doc-upload"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                            disabled={actionLoading}
+                                        />
+                                        <label
+                                            htmlFor="vehicle-doc-upload"
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 w-full h-11 rounded-xl border-2 border-dashed cursor-pointer transition-all font-bold text-xs uppercase tracking-wider",
+                                                actionLoading
+                                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                                    : "bg-white border-scafoteam-accent/30 text-scafoteam-navy hover:border-scafoteam-accent hover:bg-scafoteam-accent/5"
+                                            )}
+                                        >
+                                            {actionLoading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Upload className="w-4 h-4" />
+                                                    Izvēlēties failu
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-gray-400 font-medium text-center italic">Atbalstītie formāti: PDF, JPG, PNG</p>
                             </form>
                         </div>
 
                         <div className="flex justify-end pt-4">
-                            <Button variant="ghost" onClick={() => setSelectedVehicle(null)}>Aizvērt</Button>
+                            <Button variant="ghost" onClick={() => setSelectedVehicle(null)} className="font-bold text-gray-500">Aizvērt</Button>
                         </div>
                     </div>
                 </Modal>

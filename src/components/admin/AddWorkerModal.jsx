@@ -8,6 +8,9 @@ import { FileUp, UserPlus, Upload, Loader2, CheckCircle, AlertCircle, X, FileSpr
 import * as XLSX from 'xlsx';
 import { workerStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { ocrService } from '@/lib/ocrService';
+import { Scan } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }) {
     const { t } = useTranslation();
@@ -26,6 +29,35 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }) {
         role: 'worker',
         status: 'active'
     });
+
+    const handleScanID = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        toast.info('Skenē ID karti...');
+        try {
+            const text = await ocrService.extractText(file);
+            const personalIdMatch = text.match(/\d{6}-\d{5}/);
+            const taxMatch = text.match(/\d{11}/);
+
+            if (personalIdMatch || taxMatch) {
+                // We don't have personalId/taxNumber in the INITIAL formData state of this component
+                // but we should add them if they are detected to populate the adminData later
+                setFormData(prev => ({
+                    ...prev,
+                    personalId: personalIdMatch ? personalIdMatch[0] : prev.personalId,
+                    taxNumber: taxMatch ? taxMatch[0] : prev.taxNumber
+                }));
+                toast.success('Dati nolasīti!');
+            } else {
+                toast.warning('Neizdevās atrast ID datus.');
+            }
+        } catch (error) {
+            toast.error('Kļūda: ' + error.message);
+        } finally {
+            e.target.value = '';
+        }
+    };
 
     const handleManualSubmit = async (e) => {
         e.preventDefault();
@@ -275,6 +307,25 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }) {
                                         value={formData.email}
                                         onChange={e => setFormData(f => ({ ...f, email: e.target.value }))}
                                     />
+                                </div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Personas kods (Nav obligāts)</label>
+                                        <div className="relative group/scan">
+                                            <Input
+                                                className="h-11 border-slate-200 rounded-xl pr-10 focus:ring-scafoteam-accent font-bold"
+                                                value={formData.personalId || ''}
+                                                onChange={e => setFormData(f => ({ ...f, personalId: e.target.value }))}
+                                                placeholder="123456-12345"
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                                <input type="file" id="add-id-scan" className="hidden" accept="image/*" onChange={handleScanID} />
+                                                <label htmlFor="add-id-scan" className="p-2 text-slate-400 hover:text-scafoteam-accent cursor-pointer rounded-lg hover:bg-scafoteam-accent/5 transition-all block">
+                                                    <Scan className="w-4 h-4" />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Telefons</label>

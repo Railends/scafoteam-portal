@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 
 
 
-import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings, Home, Info } from 'lucide-react';
+import { Users, UserCheck, LayoutDashboard, LogOut, Building2, Contact, Package, GraduationCap, Menu, X, FileText, Shield, Settings, Home, Info, Car } from 'lucide-react';
 
 export function AdminLayout({ children }) {
     const { t } = useTranslation();
@@ -30,36 +30,45 @@ export function AdminLayout({ children }) {
                 const newAlerts = [];
                 const today = new Date();
 
-                // Contract Expiry Alerts (7 days)
+                // Contract Expiry Alerts
                 workerData?.forEach(w => {
                     const expiry = w.admin_data?.contractEnd;
                     if (expiry) {
                         const days = Math.ceil((new Date(expiry) - today) / (1000 * 60 * 60 * 24));
-                        if (days >= 0 && days <= 7) {
+                        if (days < 0) {
+                            newAlerts.push({
+                                id: `c-${w.id}`,
+                                message: `${w.name} ${w.surname}: līgums BEIDZIES`,
+                                severity: 'urgent'
+                            });
+                        } else if (days <= 7) {
                             newAlerts.push({
                                 id: `c-${w.id}`,
                                 message: `${w.name} ${w.surname}: beidzas līgums pēc ${days} d.`,
-                                severity: 'urgent'
+                                severity: 'warning'
                             });
                         }
                     }
                 });
 
-                // Vehicle Inspection Alerts (1, 2, 3 months)
+                // Vehicle Inspection Alerts
                 vehicleData?.forEach(v => {
                     const expiry = v.inspection_expiry;
                     if (expiry) {
                         const expiryDate = new Date(expiry);
-                        const monthsDiff = (expiryDate.getFullYear() - today.getFullYear()) * 12 + (expiryDate.getMonth() - today.getMonth());
-
-                        // Calculate days for more precise urgent/warning
                         const daysDiff = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
 
-                        if (daysDiff >= 0 && daysDiff <= 90) { // Check for 3 months (approx 90 days)
+                        if (daysDiff < 0) {
+                            newAlerts.push({
+                                id: `v-${v.id}`,
+                                message: `${v.make} ${v.model} (${v.plate_number}): TA BEIGUSIES`,
+                                severity: 'urgent'
+                            });
+                        } else if (daysDiff <= 7) {
                             newAlerts.push({
                                 id: `v-${v.id}`,
                                 message: `${v.make} ${v.model} (${v.plate_number}): TA pēc ${daysDiff} d.`,
-                                severity: daysDiff <= 30 ? 'urgent' : 'warning' // Urgent if <= 1 month, warning otherwise
+                                severity: 'warning'
                             });
                         }
                     }
@@ -130,7 +139,7 @@ export function AdminLayout({ children }) {
                             {item.label}
                         </Link>
 
-                        {/* Conditional Sub-menu for Autoparks when Residences is active or selected */}
+                        {/* Sub-menu for Autoparks specifically under Residences */}
                         {isResidences && (isActive || isFleetActive) && (
                             <div className="ml-6 mt-1 border-l-2 border-white/10 pl-2 space-y-1 animate-in slide-in-from-left-2 duration-200">
                                 <Link
@@ -143,8 +152,8 @@ export function AdminLayout({ children }) {
                                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                                     )}
                                 >
-                                    <Package className="w-4 h-4" />
-                                    Autoparks
+                                    <Car className="w-4 h-4" />
+                                    {t('admin_fleet')}
                                 </Link>
                             </div>
                         )}
@@ -289,7 +298,7 @@ export function AdminLayout({ children }) {
                                     "w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-all duration-300 border shadow-sm active:scale-95 relative",
                                     isAlertsOpen ? "bg-scafoteam-navy text-white shadow-lg" :
                                         hasUrgent ? "bg-red-500 text-white border-red-600 shadow-red-200" :
-                                            hasWarning ? "bg-orange-500 text-white border-orange-600 shadow-orange-200" :
+                                            hasWarning ? "bg-yellow-500 text-white border-yellow-600 shadow-yellow-200" :
                                                 "bg-white border-gray-100 text-scafoteam-navy hover:bg-gray-50"
                                 )}
                                 title="Paziņojumi"
@@ -335,7 +344,7 @@ export function AdminLayout({ children }) {
                                                                 "p-3 rounded-xl border text-[11px] font-bold leading-relaxed shadow-sm",
                                                                 alert.severity === 'urgent'
                                                                     ? "bg-red-50 border-red-100 text-red-700"
-                                                                    : "bg-orange-50 border-orange-100 text-orange-700"
+                                                                    : "bg-yellow-50 border-yellow-100 text-yellow-700"
                                                             )}
                                                         >
                                                             {alert.message}

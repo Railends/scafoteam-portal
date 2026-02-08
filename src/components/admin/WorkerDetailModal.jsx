@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,6 +10,9 @@ import { emailService } from '@/lib/emailService';
 import { docGenerator } from '@/lib/docGenerator';
 import { FileText, Upload, Trash2, Download, Save, Check, User, Mail, Phone, Calendar, Globe, CreditCard, ShieldCheck, MapPin, Folder, FolderPlus, RefreshCw, Loader2, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { storageService } from '@/lib/storage';
+import { ocrService } from '@/lib/ocrService';
+import { Scan } from 'lucide-react';
 
 export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
     const { t } = useTranslation();
@@ -163,16 +167,24 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
         try {
             // Update in store
             const updatedWorker = await workerStore.update(worker.id, {
-                adminData: { password: newPassword }
+                adminData: {
+                    password: newPassword,
+                    require_password_change: true
+                }
             });
             onUpdate(updatedWorker);
 
             // Send email
-            await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, newPassword);
-            alert(t('admin_password_sent', { email: worker.email }));
+            const result = await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, newPassword);
+            toast.success(t('admin_password_sent', { email: worker.email }), {
+                description: result.message
+            });
         } catch (error) {
             console.error('Reset password failed:', error);
-            alert('Kļūda atiestatot paroli.');
+            toast.warning(`SISTĒMAS PAZIŅOJUMS: Parole atiestatīta, bet e-pasts netika nosūtīts.`, {
+                description: `Iemesls: ${error.message}`,
+                duration: 10000
+            });
         } finally {
             setIsResetting(false);
         }
@@ -180,7 +192,7 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
 
     const handleGenerateDocument = async () => {
         if (!selectedTemplateId) {
-            alert('Lūdzu, vispirms izvēlieties paraugu.');
+            toast.error('Lūdzu, vispirms izvēlieties paraugu.');
             return;
         }
 
@@ -197,105 +209,120 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
             });
             if (updatedWorker) onUpdate(updatedWorker);
             setSelectedTemplateId(''); // Reset selection
+            toast.success('Dokuments veiksmīgi ģenerēts');
         } catch (error) {
             console.error('Generation failed:', error);
-            alert('Kļūda dokumenta ģenerēšanā.');
+            toast.error('Kļūda dokumenta ģenerēšanā.');
         } finally {
             setIsGenerating(false);
         }
     };
-    const handlePhotoUpload = async (e) => {
+
+
+    const handleScanID = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            reader.onloadend = async () => {
-                const updatedData = { ...formData, profileImage: reader.result };
-                setFormData(updatedData);
-                // Auto save on upload
-                const payload = { adminData: { ...worker.adminData, profileImage: reader.result } };
-                const updatedWorker = await workerStore.update(worker.id, payload);
-                onUpdate(updatedWorker);
-            };
-        };
-        reader.readAsDataURL(file);
-    };
+        toast.info('Skenē ID karti...');
+        try {
+            const text = await ocrService.extractText(file);
+            // Latvian Personal ID: 123456-12345
+            const personalIdMatch = text.match(/\d{6}-\d{5}/);
+            // Tax/Reg Number: 11 digits
+            const taxMatch = text.match(/\d{11}/);
 
-    const handleDeletePhoto = async () => {
-        if (window.confirm(t('admin_confirm_delete_photo'))) {
-            const updatedData = { ...formData, profileImage: '' };
-            setFormData(updatedData);
-            const payload = { adminData: { ...worker.adminData, profileImage: '' } };
-            const updatedWorker = await workerStore.update(worker.id, payload);
-            onUpdate(updatedWorker);
+            if (personalIdMatch) {
+                setFormData(prev => ({ ...prev, personalId: personalIdMatch[0] }));
+                toast.success('Personas kods nolasīts!');
+            }
+            if (taxMatch && (!personalIdMatch || taxMatch[0] !== personalIdMatch[0].replace('-', ''))) {
+                setFormData(prev => ({ ...prev, taxNumber: taxMatch[0] }));
+                toast.success('Nodokļu numurs nolasīts!');
+            }
+
+            if (!personalIdMatch && !taxMatch) {
+                toast.warning('Neizdevās atrast ID vai nodokļu numuru. Lūdzu, ievadiet manuāli.');
+            }
+        } catch (error) {
+            toast.error('Skenēšanas kļūda: ' + error.message);
+        } finally {
+            e.target.value = '';
         }
     };
 
-    const handleAddFolder = () => {
-        setIsCreatingFolder(true);
-        setNewFolderName('');
-    };
+    const handleDownloadDocument = async (doc) => {
+        let url = doc.content;
 
-    const handleSaveNewFolder = async () => {
-        if (newFolderName.trim()) {
-            const updatedWorker = await workerStore.addFolder(worker.id, newFolderName.trim());
-            if (updatedWorker) onUpdate(updatedWorker);
-            setIsCreatingFolder(false);
-            setNewFolderName('');
+        // GDPR Audit: Log download
+        workerStore.logAction(worker.id, 'DOWNLOAD_DOCUMENT', {
+            documentName: doc.name,
+            documentType: doc.templateId ? 'contract' : 'document'
+        });
+
+        // Helper: Check if content is base64
+        const isBase64 = (str) => typeof str === 'string' && str.startsWith('data:');
+
+        if (!isBase64(url)) {
+            // Assume Supabase Storage Path
+            // worker-documents logic
+            const signedUrl = await storageService.getSignedUrl('worker-documents', url);
+            if (signedUrl) url = signedUrl;
+            else {
+                toast.error('Neizdevās piekļūt failam (iespējams, dzēsts).');
+                return;
+            }
         }
-    };
 
-    const handleCancelFolder = () => {
-        setIsCreatingFolder(false);
-        setNewFolderName('');
-    };
-
-    const handleDeleteFolder = async (e, folderId) => {
-        e.stopPropagation();
-        if (window.confirm(t('admin_delete_folder_confirm'))) {
-            const updatedWorker = await workerStore.deleteFolder(worker.id, folderId);
-            if (updatedWorker) onUpdate(updatedWorker);
-        }
-    };
-
-    const handleDownloadDocument = (doc) => {
         const link = document.createElement('a');
-        link.href = doc.content;
+        link.href = url;
         link.download = doc.name;
+        link.target = '_blank'; // Open in new tab if possible
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    const handleDeleteDocument = async (id) => {
-        if (window.confirm(t('admin_confirm_delete'))) {
-            const updatedWorker = await workerStore.deleteDocument(worker.id, id);
-            if (updatedWorker) onUpdate(updatedWorker);
-        }
-    };
+    // ...
 
-    const handleDeleteContract = async (id) => {
-        if (window.confirm(t('admin_confirm_delete'))) {
-            const updatedWorker = await workerStore.deleteContract(worker.id, id);
-            if (updatedWorker) onUpdate(updatedWorker);
-        }
-    };
-
-    const handleAddDocument = async (e) => {
+    const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const updatedWorker = await workerStore.addDocument(worker.id, {
-                name: file.name,
-                content: reader.result,
-                folderId: currentFolderId
-            });
-            if (updatedWorker) onUpdate(updatedWorker);
-        };
-        reader.readAsDataURL(file);
+        // Validations
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Attēls ir pārāk liels (Max 5MB)');
+            return;
+        }
+
+        // Upload directly via store (store handles upload internally if we pass blob?)
+        // Actually store update relies on adminData merging.
+        // We should upload HERE and pass the URL/Path to store.
+
+        const path = `${worker.id}/avatar_${Date.now()}_${file.name}`;
+        try {
+            // Upload to 'worker-avatars'
+            const storagePath = await storageService.uploadFile('worker-avatars', path, file);
+
+            // Update Form State (immediate preview?)
+            // Use public URL for preview
+            const publicUrl = storageService.getPublicUrl('worker-avatars', storagePath);
+
+            const updatedData = { ...formData, profileImage: publicUrl };
+            setFormData(updatedData);
+
+            // Save to DB (save the PATH or key, but store logic maps it)
+            // Let's save the PATH in DB for consistency, store mapWorkerFromDB will convert to URL.
+            // Wait, mapWorkerFromDB uses getPublicUrl. So saving path is correct.
+
+            const payload = { adminData: { ...worker.adminData, profileImage: storagePath } };
+            const updatedWorker = await workerStore.update(worker.id, payload);
+            onUpdate(updatedWorker);
+            toast.success('Profila bilde atjaunināta');
+
+        } catch (error) {
+            console.error(error);
+            toast.error('Neizdevās augšupielādēt attēlu');
+        }
     };
 
     const StatusBadge = ({ label, active }) => (
@@ -349,7 +376,7 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                     className={cn("pb-2 px-1 font-bold transition-colors text-sm", activeTab === 'history' ? 'text-scafoteam-navy border-b-2 border-scafoteam-navy' : 'text-gray-400')}
                     onClick={() => setActiveTab('history')}
                 >
-                    Vēsture
+                    {t('admin_history')}
                 </button>
             </div>
 
@@ -417,7 +444,15 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('personal_id')}</label>
-                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.personalId} onChange={e => setFormData({ ...formData, personalId: e.target.value })} />
+                                        <div className="relative group/scan">
+                                            <Input className="h-8 font-bold text-scafoteam-navy pr-8" value={formData.personalId} onChange={e => setFormData({ ...formData, personalId: e.target.value })} />
+                                            <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                                <input type="file" id="id-scan-upload" className="hidden" accept="image/*" onChange={handleScanID} />
+                                                <label htmlFor="id-scan-upload" className="p-1 text-gray-400 hover:text-scafoteam-accent cursor-pointer rounded hover:bg-scafoteam-accent/5 transition-all block" title="Skenēt ID karti">
+                                                    <Scan className="w-3.5 h-3.5" />
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('finnish_id')}</label>
@@ -425,7 +460,15 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('tax_number')}</label>
-                                        <Input className="h-8 font-bold text-scafoteam-navy" value={formData.taxNumber} onChange={e => setFormData({ ...formData, taxNumber: e.target.value })} />
+                                        <div className="relative group/scan">
+                                            <Input className="h-8 font-bold text-scafoteam-navy pr-8" value={formData.taxNumber} onChange={e => setFormData({ ...formData, taxNumber: e.target.value })} />
+                                            <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                                <input type="file" id="tax-scan-upload" className="hidden" accept="image/*" onChange={handleScanID} />
+                                                <label htmlFor="tax-scan-upload" className="p-1 text-gray-400 hover:text-scafoteam-accent cursor-pointer rounded hover:bg-scafoteam-accent/5 transition-all block" title="Skenēt nodokļu numuru">
+                                                    <Scan className="w-3.5 h-3.5" />
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -504,19 +547,19 @@ export function WorkerDetailModal({ worker, isOpen, onClose, onUpdate }) {
                             {/* Clothing Sizes - NEW SECTION */}
                             <div className="space-y-6">
                                 <h3 className="text-xs font-black text-scafoteam-navy border-b border-scafoteam-navy pb-1 block">
-                                    Apģērba izmēri
+                                    {t('clothing_sizes')}
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-12 gap-y-6">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Zābaki</label>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_boots')}</label>
                                         <Input className="h-8 font-bold text-scafoteam-navy" value={formData.bootSize} onChange={e => setFormData({ ...formData, bootSize: e.target.value })} placeholder="42" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Jaka</label>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_jacket')}</label>
                                         <Input className="h-8 font-bold text-scafoteam-navy" value={formData.jacketSize} onChange={e => setFormData({ ...formData, jacketSize: e.target.value })} placeholder="L" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bikses</label>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('admin_pants')}</label>
                                         <Input className="h-8 font-bold text-scafoteam-navy" value={formData.trouserSize} onChange={e => setFormData({ ...formData, trouserSize: e.target.value })} placeholder="52" />
                                     </div>
                                 </div>

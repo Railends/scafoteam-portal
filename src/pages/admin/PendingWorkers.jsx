@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { workerStore } from '@/lib/store';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/Button';
@@ -49,19 +50,30 @@ export default function PendingWorkers() {
         const password = workerStore.generatePassword();
         const worker = workers.find(w => w.id === id);
 
-        // Update worker status and password
+        // Update worker status and password in DB
         await workerStore.update(id, {
             status: 'active',
             adminData: { password }
         });
 
+        // Update Auth password via RPC
+        const authUpdate = await workerStore.updateAuthPasswordByAdmin(id, password);
+        if (!authUpdate.success) {
+            toast.error(`Kļūda: Neizdevās uzstādīt paroli. ${authUpdate.error}`);
+        }
+
         // "Send" email
         try {
-            await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, password);
-            alert(t('admin_password_sent', { email: worker.email }));
+            const result = await emailService.sendPassword(worker.email, `${worker.name} ${worker.surname}`, password);
+            toast.success(t('admin_password_sent', { email: worker.email }), {
+                description: result.message
+            });
         } catch (error) {
             console.error('Failed to send email:', error);
-            alert('Kļūda nosūtot e-pastu. Parole tomēr ir saglabāta.');
+            toast.warning(`SISTĒMAS PAZIŅOJUMS: Parole saglabāta, bet e-pasts netika nosūtīts.`, {
+                description: `Iemesls: ${error.message}`,
+                duration: 10000
+            });
         }
 
         setWorkers(prev => prev.filter(w => w.id !== id));
@@ -78,6 +90,7 @@ export default function PendingWorkers() {
         if (!id) return;
 
         await workerStore.delete(id);
+        toast.success(t('admin_deleted_success', 'Darbinieks veiksmīgi izdzēsts'));
         setWorkers(prev => prev.filter(w => w.id !== id));
         if (selectedWorker?.id === id) setSelectedWorker(null);
         setRejectConfirm({ isOpen: false, id: null });
@@ -99,6 +112,9 @@ export default function PendingWorkers() {
     const handleBulkApprove = async () => {
         if (!confirm(`Vai tiešām vēlaties apstiprināt ${selectedIds.length} darbiniekus?`)) return;
 
+        let successCount = 0;
+        const toastId = toast.loading('Apstrādā darbiniekus...');
+
         for (const id of selectedIds) {
             const worker = workers.find(w => w.id === id);
             if (!worker) continue;
@@ -114,9 +130,12 @@ export default function PendingWorkers() {
             } catch (e) {
                 console.error(`Failed to send email to ${worker.email}`, e);
             }
+            successCount++;
         }
 
-        alert(`${selectedIds.length} darbinieki apstiprināti!`);
+        toast.dismiss(toastId);
+        toast.success(`${successCount} darbinieki veiksmīgi apstiprināti!`);
+
         setWorkers(prev => prev.filter(w => !selectedIds.includes(w.id)));
         setSelectedIds([]);
         setSelectedWorker(null);

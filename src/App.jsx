@@ -23,9 +23,32 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
+import { Toaster } from 'sonner';
+import { useNotificationStore } from '@/lib/store';
+
+function NotificationTrigger() {
+  const { checkDailyEmail } = useNotificationStore();
+
+  React.useEffect(() => {
+    // Prevent double execution in StrictMode/Multi-render
+    const sessionCheckKey = 'scafoteam_last_check_' + new Date().toISOString().split('T')[0];
+    if (sessionStorage.getItem(sessionCheckKey)) return;
+
+    const adminAuth = localStorage.getItem('scafoteam_admin_auth');
+    if (adminAuth) {
+      sessionStorage.setItem(sessionCheckKey, 'true');
+      checkDailyEmail();
+    }
+  }, [checkDailyEmail]);
+
+  return null;
+}
+
 function App() {
   return (
     <ThemeProvider>
+      <Toaster position="top-center" richColors />
+      <NotificationTrigger />
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />

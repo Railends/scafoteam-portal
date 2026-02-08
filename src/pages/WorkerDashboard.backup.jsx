@@ -4,16 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { User, FileText, Download, LogOut, ShieldCheck, Mail, Phone, MapPin, Building2, Calendar, Briefcase, CheckSquare, Square, PenTool, Check, Loader2, Upload, Lock, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
+import { User, FileText, Download, LogOut, ShieldCheck, Mail, Phone, MapPin, Building2, Calendar, Briefcase, CheckSquare, Square, PenTool, Check, Loader2, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { workerStore, templateStore, vehicleStore } from '@/lib/store';
+import { workerStore, templateStore } from '@/lib/store';
 import { docGenerator } from '@/lib/docGenerator';
-import { storageService } from '@/lib/storage';
 import { SignatureModal } from '@/components/ui/SignatureModal';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-// Settings icon already imported in the main list above
+import { Settings } from 'lucide-react';
 
 import { toast } from 'sonner';
 
@@ -62,7 +61,6 @@ function WorkerDashboardContent() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [worker, setWorker] = useState(null);
-    const [vehicles, setVehicles] = useState([]);
     const [selectedContracts, setSelectedContracts] = useState([]);
     const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
     const [isSigning, setIsSigning] = useState(false);
@@ -92,10 +90,6 @@ function WorkerDashboardContent() {
                 if (currentWorker) {
                     setWorker(currentWorker);
                     sessionStorage.setItem('workerData', JSON.stringify(currentWorker));
-
-                    // Fetch assigned vehicles
-                    const vData = await vehicleStore.getByHolderId(currentWorker.id);
-                    setVehicles(vData);
                 } else {
                     // Fallback to stored data if fetch fails (e.g. network issue) but not auth error
                     setWorker(data);
@@ -256,65 +250,10 @@ function WorkerDashboardContent() {
         }
     };
 
-
-
-    const getExpiryAlerts = () => {
-        if (!worker) return [];
-        const alerts = [];
-        const today = new Date();
-        const thirtyDaysOut = new Date();
-        thirtyDaysOut.setDate(today.getDate() + 30);
-
-        const checkDate = (dateStr, label) => {
-            if (!dateStr) return;
-            const d = new Date(dateStr);
-            if (d < today) {
-                alerts.push({ label, status: 'expired', date: dateStr });
-            } else if (d < thirtyDaysOut) {
-                alerts.push({ label, status: 'warning', date: dateStr });
-            }
-        };
-
-        checkDate(worker.adminData?.contractEnd, 'Līguma termiņš');
-        checkDate(worker.greenCardExpiry, 'Green Card termiņš');
-        checkDate(worker.hotworksExpiry, 'Hotworks termiņš');
-
-        return alerts;
-    };
-
-    const expiryAlerts = getExpiryAlerts();
-
-    const handleDownloadDocument = async (doc) => {
-        let url = doc.content;
-
-        // GDPR Audit: Log download
-        workerStore.logAction(worker.id, 'DOWNLOAD_DOCUMENT', {
-            documentName: doc.name,
-            documentType: doc.templateId ? 'contract' : 'document'
-        });
-
-        const isBase64 = (str) => typeof str === 'string' && str.startsWith('data:');
-
-        if (!isBase64(url)) {
-            try {
-                // Try getting signed URL from worker-documents
-                const signedUrl = await storageService.getSignedUrl('worker-documents', url);
-                if (signedUrl) url = signedUrl;
-                else {
-                    toast.error('Neizdevās piekļūt failam.');
-                    return;
-                }
-            } catch (e) {
-                console.error("Download error:", e);
-                toast.error('Kļūda lejupielādējot failu.');
-                return;
-            }
-        }
-
+    const handleDownloadDocument = (doc) => {
         const link = document.createElement('a');
-        link.href = url;
+        link.href = doc.content;
         link.download = doc.name;
-        link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -395,7 +334,7 @@ function WorkerDashboardContent() {
                         className="bg-white border-gray-200 text-scafoteam-navy hover:bg-scafoteam-navy/5 rounded-xl px-4 font-bold h-12 transition-all shadow-sm"
                         title={t('change_password')}
                     >
-                        <SettingsIcon className="w-5 h-5" />
+                        <Settings className="w-5 h-5" />
                     </Button>
                     <Button variant="outline" onClick={handleLogout} className="border-gray-200 text-gray-500 hover:text-red-500 hover:bg-red-50 bg-white rounded-xl px-6 font-bold h-12 transition-all shadow-sm">
                         <LogOut className="w-4 h-4 mr-2" />
@@ -406,33 +345,6 @@ function WorkerDashboardContent() {
 
 
             </div>
-
-            {expiryAlerts.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                    {expiryAlerts.map((alert, i) => (
-                        <div key={i} className={cn(
-                            "p-4 rounded-2xl flex items-center gap-4 border animate-in fade-in slide-in-from-top-2 duration-300",
-                            alert.status === 'expired'
-                                ? "bg-red-50 border-red-100 text-red-800"
-                                : "bg-orange-50 border-orange-100 text-orange-800"
-                        )}>
-                            <div className={cn(
-                                "p-2 rounded-xl shrink-0",
-                                alert.status === 'expired' ? "bg-red-100" : "bg-orange-100"
-                            )}>
-                                <AlertTriangle className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-[10px] font-black uppercase tracking-widest opacity-60 m-0">{alert.status === 'expired' ? 'Beidzies termiņš' : 'Drīz beigsies'}</p>
-                                <h4 className="font-bold text-sm leading-tight m-0">{alert.label}</h4>
-                                <p className="text-[10px] font-bold mt-1 bg-white/50 inline-block px-1.5 py-0.5 rounded italic">
-                                    {new Date(alert.date).toLocaleDateString()}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
 
             <div className="grid lg:grid-cols-3 gap-8">
                 {/* Personal Information */}
@@ -586,66 +498,44 @@ function WorkerDashboardContent() {
                     </div>
                 </div>
 
-                {/* Status Card & Vehicles */}
+                {/* Status Card */}
                 <div className="space-y-8">
-                    {/* Status Card (Already exists, assuming it's below in the file or added here) */}
+                    <Card className="border-0 shadow-2xl shadow-scafoteam-navy/10 rounded-[32px] overflow-hidden bg-gradient-to-br from-scafoteam-navy to-slate-800 text-white">
+                        <CardHeader className="pt-8 px-8">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-blue-300/60">{t('current_assignment')}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-8 pb-8 space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <Briefcase className="w-6 h-6 text-scafoteam-accent" />
 
-                    {vehicles.length > 0 && (
-                        <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-xl shadow-scafoteam-navy/5">
-                            <h3 className="text-xs font-black text-scafoteam-navy uppercase tracking-widest flex items-center gap-3 mb-6">
-                                <Car className="w-4 h-4 text-scafoteam-accent" />
-                                Tavs transportlīdzeklis
-                            </h3>
-                            <div className="space-y-4">
-                                {vehicles.map(v => (
-                                    <div key={v.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h4 className="font-bold text-scafoteam-navy">{v.make} {v.model}</h4>
-                                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">{v.plate_number}</p>
-                                            </div>
-                                            <div className="px-3 py-1 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-scafoteam-navy uppercase tracking-widest">
-                                                Aktīvs
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
-                                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                                            <span className="text-[10px] text-gray-500 font-medium">TA līdz: {v.inspection_expiry || 'Nav norādīts'}</span>
-                                        </div>
-
-                                        {v.documents && v.documents.length > 0 && (
-                                            <div className="mt-4 space-y-2">
-                                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Auto dokumenti</p>
-                                                {v.documents.map(doc => (
-                                                    <div key={doc.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-gray-50 group hover:border-scafoteam-accent/30 transition-all">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <FileText className="w-3 h-3 text-scafoteam-navy/40" />
-                                                            <span className="text-[10px] font-bold text-scafoteam-navy truncate">{doc.name}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleDownloadDocument({ ...doc, storageType: 'supabase', bucket: 'documents' })}
-                                                            className="p-1.5 text-gray-400 hover:text-scafoteam-accent"
-                                                        >
-                                                            <Download className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                </div>
+                                <div>
+                                    <p className="text-xl font-black">{worker.adminData?.project || '---'}</p>
+                                    <p className="text-[10px] text-blue-200/50 font-bold uppercase tracking-widest mt-0.5">{t('admin_project')}</p>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 relative">
+                                <div className="flex justify-between items-start mb-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-200/40">{t('hourly_rate')}</p>
+                                    {worker.adminData?.hasPerDiem && (
+                                        <span className="px-2 py-0.5 bg-scafoteam-navy text-white text-[8px] font-black uppercase rounded-md shadow-lg shadow-scafoteam-navy/20 whitespace-nowrap">+ P.D</span>
+
+                                    )}
+                                </div>
+                                <p className="text-4xl font-black text-white">€ {worker.adminData?.hourlyRate || '0.00'}</p>
+                            </div>
+
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
-            <SignatureModal
+            {/* <SignatureModal
                 isOpen={isSignatureModalOpen}
                 onClose={() => setIsSignatureModalOpen(false)}
                 onSave={handleSaveSignature}
                 isSigning={isSigning}
-            />
+            /> */}
 
             {/* Success Toast */}
             {showToast && (

@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { workerStore } from '@/lib/store';
-import { User, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { MathCaptcha } from '@/components/common/MathCaptcha';
+import { toast } from 'sonner';
 
 export default function WorkerLogin() {
     const { t } = useTranslation();
@@ -14,18 +16,70 @@ export default function WorkerLogin() {
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isCaptchaValid, setIsCaptchaValid] = useState(false);
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        const worker = await workerStore.login(identifier.trim(), password.trim());
-        if (worker) {
-            sessionStorage.setItem('workerData', JSON.stringify(worker));
-            navigate('/worker/dashboard');
-        } else {
-            setError(t('login_failed_security_update') || 'Invalid credentials or account transition required. Please contact admin.');
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const result = await workerStore.login(identifier.trim(), password.trim());
+
+            if (result?.isAdminRedirect) {
+                toast.info("Šis ir Administratora konts. Tūlīt tiksiet novirzīts uz Admin portālu.");
+                navigate('/admin');
+                return;
+            }
+
+            if (result && !result.error) {
+                const worker = result;
+                if (worker.isLegacy) {
+                    // Auto-migrate silently/with toast instead of prompt
+                    const toastId = toast.loading(t('admin_updating_security', 'Atjaunina konta drošību...'));
+
+                    try {
+                        const migrationResult = await workerStore.migrateAccount(worker.id, worker.email, password.trim());
+
+                        if (migrationResult.success) {
+                            toast.dismiss(toastId);
+                            toast.success(t('admin_security_updated', 'Drošība atjaunota veiksmīgi'));
+
+                            // Update worker ID to the new Auth UID
+                            if (migrationResult.uid) {
+                                worker.id = migrationResult.uid;
+                            }
+                        } else {
+                            toast.dismiss(toastId);
+                            toast.error("Drošības atjaunināšana neizdevās: " + migrationResult.error);
+                            return; // Stop login if migration fails
+                        }
+                    } catch (e) {
+                        toast.dismiss(toastId);
+                        toast.error("Kļūda migrācijas laikā");
+                        return;
+                    }
+                }
+
+                const finalWorker = {
+                    ...worker,
+                    requirePasswordChange: worker.adminData?.require_password_change || false
+                };
+
+                sessionStorage.setItem('workerData', JSON.stringify(finalWorker));
+                navigate('/worker/dashboard');
+            } else {
+                const errorMsg = result?.error || t('login_failed_security_update') || 'Nepareizs e-pasts vai parole.';
+                setError(errorMsg);
+            }
+        } catch (err) {
+            console.error("Login Error:", err);
+            setError("Notika kļūda. Mēģiniet vēlreiz.");
+        } finally {
+            setIsLoading(false);
         }
     };
-
 
     return (
         <Layout className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -50,10 +104,10 @@ export default function WorkerLogin() {
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">{t('email')}</label>
                                 <div className="relative">
 
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                     <Input
                                         className="pl-11 h-14 bg-gray-50 border-gray-100 rounded-xl font-bold focus:bg-white transition-all"
-                                        placeholder="email@example.com"
+                                        placeholder="piemērs@epasts.lv"
                                         value={identifier}
                                         onChange={(e) => setIdentifier(e.target.value)}
                                         required
@@ -75,8 +129,9 @@ export default function WorkerLogin() {
                                 </div>
                             </div>
                         </div>
-                        <Button type="submit" className="w-full h-14 bg-scafoteam-navy hover:bg-scafoteam-navy/90 text-white font-black uppercase tracking-widest rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-scafoteam-navy/20">
-                            {t('login')}
+                        <MathCaptcha onValidate={setIsCaptchaValid} />
+                        <Button type="submit" disabled={!isCaptchaValid || isLoading} className="w-full h-14 bg-scafoteam-navy hover:bg-scafoteam-navy/90 text-white font-black uppercase tracking-widest rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-scafoteam-navy/20">
+                            {isLoading ? 'Ielādē...' : t('login')}
                             <ArrowRight className="ml-2 w-5 h-5" />
                         </Button>
                     </form>

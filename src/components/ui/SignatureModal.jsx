@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { X, RotateCcw, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export function SignatureModal({ isOpen, onClose, onSave, isSigning }) {
     const { t } = useTranslation();
@@ -21,7 +22,7 @@ export function SignatureModal({ isOpen, onClose, onSave, isSigning }) {
         }
         if (sigPad.current.isEmpty()) {
             console.warn('SignatureModal: Canvas is empty');
-            alert(t('admin_please_sign') || 'Lūdzu, parakstieties!');
+            toast.warning(t('admin_please_sign') || 'Lūdzu, parakstieties!');
             return;
         }
         try {
@@ -33,7 +34,7 @@ export function SignatureModal({ isOpen, onClose, onSave, isSigning }) {
             onSave(dataUrl);
         } catch (e) {
             console.error('SignatureModal: Failed to capture signature', e);
-            alert('Neizdevās saglabāt parakstu: ' + e.message);
+            toast.error('Neizdevās saglabāt parakstu: ' + e.message);
         }
     };
 

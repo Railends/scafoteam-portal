@@ -76,16 +76,20 @@ CREATE POLICY allow_anon_registration ON public.workers
     WITH CHECK (true);
 
 -- 7. Private Storage for sensitive documents
--- Assuming a bucket named 'worker-docs' exists.
--- Policy: Only owner (worker) or admin can view.
-/*
-CREATE POLICY "Owner and Admin can view documents" ON storage.objects
-    FOR SELECT TO authenticated
+-- Ensure a bucket named 'worker-docs' exists and is set to PRIVATE in Supabase.
+-- Policy: Only owner (worker) or admin can view/manage.
+
+DROP POLICY IF EXISTS "Owner and Admin can manage documents" ON storage.objects;
+CREATE POLICY "Owner and Admin can manage documents" ON storage.objects
+    FOR ALL TO authenticated
     USING (
         bucket_id = 'worker-docs' AND 
         (auth.uid()::text = (storage.foldername(name))[1] OR is_admin())
+    )
+    WITH CHECK (
+        bucket_id = 'worker-docs' AND 
+        (auth.uid()::text = (storage.foldername(name))[1] OR is_admin())
     );
-*/
 
 -- 8. Audit Logging (Service Side)
 DROP POLICY IF EXISTS worker_add_logs ON public.audit_logs;

@@ -54,4 +54,3 @@ export function BrandLogo({ className, variant = 'default' }) {
         </svg>
     );
 }
-

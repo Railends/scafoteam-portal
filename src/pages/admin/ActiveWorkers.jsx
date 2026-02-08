@@ -9,6 +9,7 @@ import { AddWorkerModal } from '@/components/admin/AddWorkerModal';
 import { WorkerDetailModal } from '@/components/admin/WorkerDetailModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Helper component for multi-select dropdown with checkboxes
 const MultiSelectCheckbox = ({ label, options, selected, onChange, icon: Icon, placeholder }) => {
@@ -126,8 +127,14 @@ export default function ActiveWorkers() {
     const handleDeleteConfirm = async () => {
         const id = confirmDelete.id;
         if (!id) return;
-        await workerStore.delete(id);
-        loadData();
+        try {
+            await workerStore.delete(id);
+            loadData();
+            setConfirmDelete({ isOpen: false, id: null });
+        } catch (error) {
+            console.error('Failed to delete worker:', error);
+            toast.error('Kļūda dzēšot darbinieku (iespējams, piesaistīti dati): ' + (error.message || 'Nezināma kļūda'));
+        }
     };
 
 
@@ -171,7 +178,7 @@ export default function ActiveWorkers() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
                         <h1 className="text-3xl font-black text-scafoteam-navy tracking-tight uppercase">{t('active_workers')}</h1>
-                        <p className="text-slate-500 font-medium text-sm mt-1">{workers.length} {t('active_workers_count')}</p>
+                        <p className="text-slate-500 font-medium text-sm mt-1">{t('active_workers_count', { count: workers.length })}</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <Button
@@ -413,7 +420,7 @@ export default function ActiveWorkers() {
                     isOpen={confirmDelete.isOpen}
                     onClose={() => setConfirmDelete({ ...confirmDelete, isOpen: false })}
                     onConfirm={handleDeleteConfirm}
-                    title={t('admin_confirm_delete_photo') || t('delete')}
+                    title={t('admin_confirm_delete_worker') || t('delete')}
                     message={t('admin_confirm_delete')}
                     confirmText={t('delete')}
                     cancelText={t('cancel')}
